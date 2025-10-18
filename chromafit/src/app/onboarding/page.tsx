@@ -5,11 +5,16 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { AvatarUpload } from '@/components/AvatarUpload'
 import { User } from 'lucide-react'
 
 export default function OnboardingPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [error, setError] = useState('')
+  const [showUpload, setShowUpload] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -25,6 +30,65 @@ export default function OnboardingPage() {
     }
     getUser()
   }, [router, supabase.auth])
+
+  const handleUpload = async (file: File): Promise<string> => {
+    if (!user) throw new Error('User not authenticated')
+
+    setIsUploading(true)
+    setUploadProgress(0)
+    setError('')
+
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}/avatar.${fileExt}`
+      
+      setUploadProgress(25)
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        })
+
+      if (uploadError) throw uploadError
+
+      setUploadProgress(50)
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName)
+
+      setUploadProgress(75)
+
+      // Update user profile (skip API call for now)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          avatar_photo_url: urlData.publicUrl
+        })
+        .eq('user_id', user.id)
+
+      if (profileError) throw profileError
+
+      setUploadProgress(100)
+      return urlData.publicUrl
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+      throw err
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleComplete = (imageUrl: string) => {
+    setTimeout(() => {
+      router.push('/dashboard')
+    }, 1000)
+  }
 
   const handleSkipToDashboard = () => {
     router.push('/dashboard')
@@ -82,22 +146,42 @@ export default function OnboardingPage() {
               </ul>
             </div>
 
-            <div className="space-y-3">
-              <Button 
-                className="w-full" 
-                size="lg"
-                onClick={() => alert('Avatar upload feature coming soon! For now, skip to dashboard to explore.')}
-              >
-                Upload Photo & Create Avatar
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={handleSkipToDashboard}
-              >
-                Skip for Now
-              </Button>
-            </div>
+            {!showUpload ? (
+              <div className="space-y-3">
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => setShowUpload(true)}
+                >
+                  Upload Photo & Create Avatar
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={handleSkipToDashboard}
+                >
+                  Skip for Now
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <AvatarUpload
+                  onUpload={handleUpload}
+                  onComplete={handleComplete}
+                  isUploading={isUploading}
+                  uploadProgress={uploadProgress}
+                  error={error}
+                />
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => setShowUpload(false)}
+                  disabled={isUploading}
+                >
+                  Back
+                </Button>
+              </div>
+            )}
 
             <p className="text-xs text-center text-gray-500">
               Your photo will be processed securely and used only to create your 3D avatar

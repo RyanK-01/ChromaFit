@@ -59,14 +59,24 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
     reader.onloadend = () => {
       const img = new window.Image()
       img.onload = () => {
-        if (img.width < 512 || img.height < 512) {
-          setError('For best results, please use an image at least 512x512 pixels')
+        // Hard minimum: 256x256
+        if (img.width < 256 || img.height < 256) {
+          setError('Image must be at least 256x256 pixels. Please use a larger image.')
           setPhotoFile(null)
           setPhotoPreview(null)
           return
         }
+        
+        // Show warning for images smaller than 512x512 but still accept them
+        if (img.width < 512 || img.height < 512) {
+          setError('⚠️ Image is smaller than recommended (512x512). Quality may be affected, but upload is allowed.')
+        } else {
+          // Clear any previous errors for good quality images
+          setError('')
+        }
+        
+        // Always set preview if image is >= 256x256
         setPhotoPreview(reader.result as string)
-        setError('')
       }
       img.src = reader.result as string
     }
@@ -200,7 +210,13 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
       const aiGeneratedUrl = await generateAIGarment(originalPhotoUrl)
 
       // Save to database
-      const { error: insertError } = await supabase
+      console.log('💾 Attempting to save to wardrobe:', {
+        user_id: user.id,
+        name: name,
+        category: category
+      })
+      
+      const { data: insertData, error: insertError } = await supabase
         .from('wardrobe')
         .insert({
           user_id: user.id,
@@ -215,7 +231,18 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
           notes: notes || null
         })
 
-      if (insertError) throw insertError
+      if (insertError) {
+        console.error('❌ Database insert error:', insertError)
+        console.error('❌ Error details:', {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code
+        })
+        throw insertError
+      }
+
+      console.log('✅ Successfully saved to wardrobe:', insertData)
 
       setSuccess('Garment added successfully!')
       setTimeout(() => {
