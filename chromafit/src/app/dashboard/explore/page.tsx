@@ -1,144 +1,77 @@
 ﻿'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { TrendingUp, ArrowUp, Search, Flame, ArrowLeft, Heart, Share2 } from 'lucide-react'
+import { TrendingUp, ArrowUp, Search, Flame, ArrowLeft, Heart, Share2, Loader2, RefreshCw } from 'lucide-react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
+import toast, { Toaster } from 'react-hot-toast'
 
-// Mock trend data with image placeholders
-const TRENDS = [
-  { 
-    id: 1,
-    keyword: 'Y2K Fashion', 
-    volume: 125000, 
-    growth: 45.2, 
-    category: 'style', 
-    tags: ['low rise jeans', 'butterfly clips', 'crop tops'],
-    imageUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&h=500&fit=crop',
-    description: 'Early 2000s nostalgia with a modern twist'
-  },
-  { 
-    id: 2,
-    keyword: 'Cottagecore', 
-    volume: 98000, 
-    growth: 32.8, 
-    category: 'aesthetic', 
-    tags: ['prairie dress', 'floral patterns', 'vintage'],
-    imageUrl: 'https://images.unsplash.com/photo-1496217590455-aa63a8350eea?w=400&h=500&fit=crop',
-    description: 'Romantic rural-inspired fashion'
-  },
-  { 
-    id: 3,
-    keyword: 'Dark Academia', 
-    volume: 87000, 
-    growth: 28.5, 
-    category: 'aesthetic', 
-    tags: ['blazers', 'plaid skirts', 'oxford shoes'],
-    imageUrl: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&h=500&fit=crop',
-    description: 'Classic, scholarly elegance'
-  },
-  { 
-    id: 4,
-    keyword: 'Oversized Blazers', 
-    volume: 156000, 
-    growth: 67.3, 
-    category: 'garment', 
-    tags: ['power dressing', 'structured', 'tailored'],
-    imageUrl: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400&h=500&fit=crop',
-    description: 'Bold statement pieces'
-  },
-  { 
-    id: 5,
-    keyword: 'Wide Leg Pants', 
-    volume: 203000, 
-    growth: 89.4, 
-    category: 'garment', 
-    tags: ['palazzo pants', 'comfort', 'flowy'],
-    imageUrl: 'https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=400&h=500&fit=crop',
-    description: 'Comfortable and chic'
-  },
-  { 
-    id: 6,
-    keyword: 'Monochrome Outfits', 
-    volume: 112000, 
-    growth: 41.7, 
-    category: 'style', 
-    tags: ['minimal', 'sophisticated', 'all black'],
-    imageUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&h=500&fit=crop',
-    description: 'Sleek and sophisticated'
-  },
-  { 
-    id: 7,
-    keyword: 'Sustainable Fashion', 
-    volume: 189000, 
-    growth: 78.9, 
-    category: 'movement', 
-    tags: ['eco-friendly', 'thrifting', 'vintage'],
-    imageUrl: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=400&h=500&fit=crop',
-    description: 'Ethical and eco-conscious'
-  },
-  { 
-    id: 8,
-    keyword: 'Athleisure', 
-    volume: 234000, 
-    growth: 52.1, 
-    category: 'style', 
-    tags: ['sporty', 'comfortable', 'activewear'],
-    imageUrl: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=400&h=500&fit=crop',
-    description: 'Sport meets street style'
-  },
-  { 
-    id: 9,
-    keyword: 'Vintage Denim', 
-    volume: 145000, 
-    growth: 55.3, 
-    category: 'garment', 
-    tags: ['90s', 'relaxed fit', 'distressed'],
-    imageUrl: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=400&h=500&fit=crop',
-    description: 'Timeless denim pieces'
-  },
-  { 
-    id: 10,
-    keyword: 'Minimalist Wardrobe', 
-    volume: 167000, 
-    growth: 63.8, 
-    category: 'movement', 
-    tags: ['capsule', 'neutral', 'quality'],
-    imageUrl: 'https://images.unsplash.com/photo-1558769132-cb1aea1c8347?w=400&h=500&fit=crop',
-    description: 'Less is more approach'
-  },
-  { 
-    id: 11,
-    keyword: 'Streetwear', 
-    volume: 278000, 
-    growth: 72.4, 
-    category: 'style', 
-    tags: ['urban', 'sneakers', 'hoodies'],
-    imageUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&h=500&fit=crop',
-    description: 'Urban casual fashion'
-  },
-  { 
-    id: 12,
-    keyword: 'Boho Chic', 
-    volume: 134000, 
-    growth: 38.9, 
-    category: 'aesthetic', 
-    tags: ['flowy', 'patterns', 'earthy'],
-    imageUrl: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=400&h=500&fit=crop',
-    description: 'Free-spirited and artistic'
-  }
-]
+interface Trend {
+  id: number
+  keyword: string
+  volume: number
+  growth: number
+  category: string
+  tags: string[]
+  imageUrl: string
+  description: string
+}
 
 export default function ExplorePage() {
   const router = useRouter()
   const [category, setCategory] = useState('all')
   const [likedTrends, setLikedTrends] = useState<number[]>([])
+  const [trends, setTrends] = useState<Trend[]>([])
+  const [loading, setLoading] = useState(true)
+  const [source, setSource] = useState<string>('')
   
-  const filtered = category === 'all' ? TRENDS : TRENDS.filter(t => t.category === category)
+  const fetchTrends = async () => {
+    setLoading(true)
+    try {
+      console.log('Fetching trends from API...')
+      const response = await fetch('/api/explore-trends-openai')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch trends')
+      }
+
+      const data = await response.json()
+      console.log('Trends fetched:', data)
+      
+      setTrends(data.trends || [])
+      setSource(data.source || 'unknown')
+      
+      if (data.source === 'openai-generated') {
+        toast.success('🤖 Loaded AI-powered fashion trends!')
+      } else if (data.source === 'google-pse-openai') {
+        toast.success('🔍 Loaded AI-analyzed web trends!')
+      } else if (data.source === 'vertex-ai') {
+        toast.success('🤖 Loaded fresh AI-powered trends!')
+      } else if (data.source === 'real-time-web') {
+        toast.success('🌐 Loaded real-time fashion trends!')
+      } else if (data.source?.includes('dynamic-realistic')) {
+        toast.success('✨ Loaded current seasonal trends!')
+      } else if (data.source?.includes('fallback')) {
+        toast('📚 Using curated trend collection', { icon: '📚' })
+      }
+    } catch (error) {
+      console.error('Error fetching trends:', error)
+      toast.error('Failed to load trends')
+      setTrends([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTrends()
+  }, [])
+  
+  const filtered = category === 'all' ? trends : trends.filter(t => t.category === category)
 
   const toggleLike = (trendId: number) => {
     setLikedTrends(prev => 
@@ -148,10 +81,23 @@ export default function ExplorePage() {
     )
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-orange-600 mx-auto mb-4" />
+          <p className="text-gray-600">Discovering the latest trends...</p>
+          <p className="text-sm text-gray-400 mt-2">Powered by AI</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-center" />
       {/* Header */}
-      <div className="bg-white/90 backdrop-blur-md border-b">
+      <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
@@ -171,10 +117,27 @@ export default function ExplorePage() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">Explore Trending Styles</h1>
-                  <p className="text-gray-600 mt-1">Discover what's trending in fashion right now</p>
+                  <p className="text-gray-600 mt-1">
+                    Discover what's trending in fashion right now
+                    {source === 'openai-generated' && <span className="text-green-600 ml-2 font-semibold">• AI-Powered Trends</span>}
+                    {source === 'google-pse-openai' && <span className="text-purple-600 ml-2 font-semibold">• Powered by Google Search + AI</span>}
+                    {source === 'vertex-ai' && <span className="text-green-600 ml-2 font-semibold">• AI-Powered Real-Time</span>}
+                    {source === 'real-time-web' && <span className="text-blue-600 ml-2 font-semibold">• Live Fashion Data</span>}
+                    {source?.includes('dynamic-realistic') && <span className="text-blue-600 ml-2 font-semibold">• Current Season Trends</span>}
+                  </p>
                 </div>
               </div>
             </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={fetchTrends}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
         </div>
       </div>
@@ -349,3 +312,4 @@ export default function ExplorePage() {
     </div>
   )
 }
+
