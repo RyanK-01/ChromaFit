@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   user_id uuid references auth.users(id) on delete cascade primary key,
   display_name text,
   avatar_photo_url text,
+  realistic_photo_url text,
   body_metrics jsonb,
   smpl_params jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -196,13 +197,70 @@ WHERE id NOT IN (SELECT user_id FROM public.profiles)
 ON CONFLICT (user_id) DO NOTHING;
 
 -- ============================================
--- PART 3: VERIFICATION
+-- PART 3: WARDROBE TABLE SETUP
+-- ============================================
+
+-- Step 1: Create wardrobe table
+CREATE TABLE IF NOT EXISTS public.wardrobe (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  name text not null,
+  category text not null check (category in ('top', 'bottom', 'dress', 'outerwear', 'shoes', 'accessories', 'other')),
+  original_photo_url text not null,
+  ai_generated_url text,
+  brand text,
+  size text,
+  color text,
+  material text,
+  notes text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Step 2: Enable RLS on wardrobe
+ALTER TABLE public.wardrobe ENABLE ROW LEVEL SECURITY;
+
+-- Step 3: Create wardrobe RLS policies
+DROP POLICY IF EXISTS "Users can view their own wardrobe" ON public.wardrobe;
+DROP POLICY IF EXISTS "Users can insert their own wardrobe items" ON public.wardrobe;
+DROP POLICY IF EXISTS "Users can update their own wardrobe items" ON public.wardrobe;
+DROP POLICY IF EXISTS "Users can delete their own wardrobe items" ON public.wardrobe;
+
+CREATE POLICY "Users can view their own wardrobe"
+ON public.wardrobe
+FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own wardrobe items"
+ON public.wardrobe
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own wardrobe items"
+ON public.wardrobe
+FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own wardrobe items"
+ON public.wardrobe
+FOR DELETE
+USING (auth.uid() = user_id);
+
+-- Step 4: Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS wardrobe_user_id_idx ON public.wardrobe(user_id);
+CREATE INDEX IF NOT EXISTS wardrobe_category_idx ON public.wardrobe(category);
+CREATE INDEX IF NOT EXISTS wardrobe_created_at_idx ON public.wardrobe(created_at DESC);
+
+-- ============================================
+-- PART 4: VERIFICATION
 -- ============================================
 
 -- Show results
 SELECT '✅ Storage buckets created' as status;
 SELECT '✅ Storage policies created' as status;
 SELECT '✅ Profiles table created' as status;
+SELECT '✅ Wardrobe table created' as status;
 SELECT '✅ RLS policies created' as status;
 SELECT '✅ Trigger created for new users' as status;
 

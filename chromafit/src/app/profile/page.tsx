@@ -307,6 +307,7 @@ export default function ProfilePage() {
           user_id: user.id,
           display_name: fullName,
           avatar_photo_url: photoUrl,
+          realistic_photo_url: generated2DUrl || photoUrl, // Store realistic version
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id'
