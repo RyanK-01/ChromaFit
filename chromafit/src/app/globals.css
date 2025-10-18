@@ -120,3 +120,31 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .bg-grid-black {
+    background-size: 30px 30px;
+    background-image: radial-gradient(
+      circle,
+      currentColor 1px,
+      transparent 1px
+    );
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient 15s ease infinite;
+  }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}

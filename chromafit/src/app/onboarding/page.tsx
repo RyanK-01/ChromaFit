@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { User } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 export default function OnboardingPage() {
   const [user, setUser] = useState<any>(null)
@@ -32,78 +33,102 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#E6DCD3]">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-neutral-300 border-t-neutral-800"></div>
+          <p className="mt-4 text-neutral-600 font-light">Loading...</p>
+        </motion.div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome to ChromaFit!</h1>
-          <p className="text-xl text-gray-600">
-            Let's create your 3D avatar
+    <div className="min-h-screen bg-[#E6DCD3] py-12 px-4">
+      <div className="max-w-3xl mx-auto">
+        <motion.div 
+          className="text-center mb-12"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <h1 className="text-4xl font-light text-neutral-800 mb-3 tracking-tight">Create your avatar</h1>
+          <p className="text-lg text-neutral-600 font-light">
+            Let's get you set up with a personalized 3D avatar
           </p>
-        </div>
+        </motion.div>
 
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <div className="flex justify-center mb-4">
-              <div className="bg-blue-100 p-4 rounded-full">
-                <User className="h-12 w-12 text-blue-600" />
-              </div>
-            </div>
-            <CardTitle className="text-center text-2xl">Create Your 3D Avatar</CardTitle>
-            <CardDescription className="text-center">
-              Upload a photo to generate your personalized 3D avatar with accurate body measurements
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="bg-gray-50 rounded-lg p-6 space-y-4">
-              <h3 className="font-semibold text-lg">What you'll need:</h3>
-              <ul className="space-y-2">
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">✓</span>
-                  <span>A full-body photo (front-facing works best)</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">✓</span>
-                  <span>Good lighting conditions</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">✓</span>
-                  <span>Wear form-fitting clothes for accurate measurements</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="space-y-3">
-              <Button 
-                className="w-full" 
-                size="lg"
-                onClick={() => alert('Avatar upload feature coming soon! For now, skip to dashboard to explore.')}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <Card className="max-w-2xl mx-auto bg-white/90 backdrop-blur-sm border-neutral-200">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-2xl font-normal text-neutral-800 tracking-tight">Upload a photo</CardTitle>
+              <CardDescription className="text-neutral-600">
+                We'll create your 3D avatar with accurate measurements
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <motion.div
+                className="rounded-2xl p-6 space-y-4 bg-neutral-50/50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
               >
-                Upload Photo & Create Avatar
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={handleSkipToDashboard}
-              >
-                Skip for Now
-              </Button>
-            </div>
+                <h3 className="text-lg text-neutral-700 font-normal">For best results:</h3>
+                <ul className="space-y-3">
+                  <li className="flex items-center gap-3 text-neutral-600">
+                    <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-neutral-800 text-white text-sm">1</span>
+                    <span>Take a full-body photo while standing straight</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-neutral-600">
+                    <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-neutral-800 text-white text-sm">2</span>
+                    <span>Ensure good lighting and a plain background</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-neutral-600">
+                    <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-neutral-800 text-white text-sm">3</span>
+                    <span>Wear form-fitting clothes for accurate measurements</span>
+                  </li>
+                </ul>
+              </motion.div>
 
-            <p className="text-xs text-center text-gray-500">
-              Your photo will be processed securely and used only to create your 3D avatar
-            </p>
-          </CardContent>
-        </Card>
+              <motion.div 
+                className="space-y-3"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.6 }}
+              >
+                <Button 
+                  className="w-full h-12 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors text-lg font-light" 
+                  onClick={() => alert('Avatar upload feature coming soon! For now, skip to dashboard to explore.')}
+                >
+                  Choose photo
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full h-12 rounded-full border-neutral-300 hover:bg-neutral-100 text-neutral-600 transition-colors" 
+                  onClick={handleSkipToDashboard}
+                >
+                  Skip for now
+                </Button>
+              </motion.div>
+
+              <motion.p 
+                className="text-sm text-center text-neutral-500"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.8 }}
+              >
+                Your photo will be processed securely and only used to create your avatar
+              </motion.p>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   )
