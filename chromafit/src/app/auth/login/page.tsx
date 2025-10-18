@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -23,31 +24,38 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) {
-        setError(error.message)
-      } else if (data.user) {
-        // Check if user has completed onboarding (has avatar)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('avatar_photo_url')
-          .eq('user_id', data.user.id)
-          .single()
+      if (signInError) {
+        setError(signInError.message)
+        setLoading(false)
+        return
+      }
 
-        if (profile?.avatar_photo_url) {
-          router.push('/dashboard')
-        } else {
-          router.push('/onboarding')
-        }
+      if (!data.user) {
+        setError('Unable to sign in. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Check if user has completed onboarding (has avatar)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('avatar_photo_url')
+        .eq('user_id', data.user.id)
+        .single()
+
+      if (profile?.avatar_photo_url) {
+        router.push('/dashboard')
+      } else {
+        router.push('/onboarding')
       }
     } catch (err) {
-      setError('An unexpected error occurred')
-      console.error(err)
-    } finally {
+      console.error('Login error:', err)
+      setError('An unexpected error occurred. Please try again.')
       setLoading(false)
     }
   }
@@ -107,7 +115,14 @@ export default function LoginPage() {
               className="w-full"
               disabled={loading}
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign in'
+              )}
             </Button>
           </form>
 

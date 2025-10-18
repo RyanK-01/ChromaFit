@@ -1,0 +1,4 @@
+{
+  "typescript.tsdk": "chromafit/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}

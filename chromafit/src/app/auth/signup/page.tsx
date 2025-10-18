@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, Loader2 } from 'lucide-react'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -28,6 +28,12 @@ export default function SignupPage() {
     setSuccess(false)
 
     // Validation
+    if (!fullName.trim()) {
+      setError('Please enter your full name')
+      setLoading(false)
+      return
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match')
       setLoading(false)
@@ -41,7 +47,7 @@ export default function SignupPage() {
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -52,24 +58,33 @@ export default function SignupPage() {
         },
       })
 
-      if (error) {
-        setError(error.message)
-      } else if (data.user) {
-        // Check if email confirmation is required
-        if (data.user.identities && data.user.identities.length === 0) {
-          setError('This email is already registered. Please sign in instead.')
-        } else {
-          setSuccess(true)
-          // Redirect to onboarding after a short delay
-          setTimeout(() => {
-            router.push('/onboarding')
-          }, 2000)
-        }
+      if (signUpError) {
+        setError(signUpError.message)
+        setLoading(false)
+        return
       }
+
+      if (!data.user) {
+        setError('Unable to create account. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Check if email confirmation is required
+      if (data.user.identities && data.user.identities.length === 0) {
+        setError('This email is already registered. Please sign in instead.')
+        setLoading(false)
+        return
+      }
+
+      setSuccess(true)
+      // Redirect to onboarding after a short delay
+      setTimeout(() => {
+        router.push('/onboarding')
+      }, 2000)
     } catch (err) {
-      setError('An unexpected error occurred')
-      console.error(err)
-    } finally {
+      console.error('Signup error:', err)
+      setError('An unexpected error occurred. Please try again.')
       setLoading(false)
     }
   }
@@ -184,7 +199,14 @@ export default function SignupPage() {
               className="w-full"
               disabled={loading}
             >
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                'Create account'
+              )}
             </Button>
           </form>
 
