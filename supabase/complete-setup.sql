@@ -46,21 +46,21 @@ CREATE POLICY "Users can upload their avatar"
 ON storage.objects FOR INSERT
 WITH CHECK (
   bucket_id = 'avatars' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
+  AND auth.uid() IS NOT NULL
 );
 
 CREATE POLICY "Users can update their avatar"
 ON storage.objects FOR UPDATE
 USING (
   bucket_id = 'avatars' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
+  AND auth.uid() IS NOT NULL
 );
 
 CREATE POLICY "Users can delete their avatar"
 ON storage.objects FOR DELETE
 USING (
   bucket_id = 'avatars' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
+  AND auth.uid() IS NOT NULL
 );
 
 -- Step 4: Create storage policies for GARMENTS
@@ -72,21 +72,21 @@ CREATE POLICY "Users can upload their garments"
 ON storage.objects FOR INSERT
 WITH CHECK (
   bucket_id = 'garments' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
+  AND auth.uid() IS NOT NULL
 );
 
 CREATE POLICY "Users can update their garments"
 ON storage.objects FOR UPDATE
 USING (
   bucket_id = 'garments' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
+  AND auth.uid() IS NOT NULL
 );
 
 CREATE POLICY "Users can delete their garments"
 ON storage.objects FOR DELETE
 USING (
   bucket_id = 'garments' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
+  AND auth.uid() IS NOT NULL
 );
 
 -- Step 5: Create storage policies for TRYONS
@@ -98,21 +98,21 @@ CREATE POLICY "Users can upload their tryons"
 ON storage.objects FOR INSERT
 WITH CHECK (
   bucket_id = 'tryons' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
+  AND auth.uid() IS NOT NULL
 );
 
 CREATE POLICY "Users can update their tryons"
 ON storage.objects FOR UPDATE
 USING (
   bucket_id = 'tryons' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
+  AND auth.uid() IS NOT NULL
 );
 
 CREATE POLICY "Users can delete their tryons"
 ON storage.objects FOR DELETE
 USING (
   bucket_id = 'tryons' 
-  AND auth.uid()::text = (storage.foldername(name))[1]
+  AND auth.uid() IS NOT NULL
 );
 
 -- ============================================

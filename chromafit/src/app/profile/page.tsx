@@ -72,27 +72,39 @@ export default function ProfilePage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file')
+    // Validate file type - only accept common image formats
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      setError('Please select a valid image file (JPEG, PNG, or WebP)')
       return
     }
 
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image size should be less than 5MB')
+    // Validate file size (10MB max for better quality 3D models)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image size should be less than 10MB')
       return
     }
 
     setPhotoFile(file)
     
-    // Create preview
+    // Create preview and validate image dimensions
     const reader = new FileReader()
     reader.onloadend = () => {
-      setPhotoPreview(reader.result as string)
+      const img = new window.Image()
+      img.onload = () => {
+        // Recommend minimum dimensions for 3D model quality
+        if (img.width < 512 || img.height < 512) {
+          setError('For best 3D avatar results, please use an image at least 512x512 pixels')
+          setPhotoFile(null)
+          setPhotoPreview(null)
+          return
+        }
+        setPhotoPreview(reader.result as string)
+        setError('')
+      }
+      img.src = reader.result as string
     }
     reader.readAsDataURL(file)
-    setError('')
   }
 
   const uploadPhoto = async () => {
@@ -100,16 +112,30 @@ export default function ProfilePage() {
 
     setUploading(true)
     try {
+      // Delete old avatar if exists
+      if (profile?.avatar_photo_url) {
+        try {
+          const oldPath = profile.avatar_photo_url.split('/avatars/')[1]
+          if (oldPath) {
+            await supabase.storage.from('avatars').remove([oldPath])
+          }
+        } catch (err) {
+          console.log('Could not delete old avatar:', err)
+          // Continue anyway - not critical
+        }
+      }
+
       const fileExt = photoFile.name.split('.').pop()
       const fileName = `${user.id}-${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+      const filePath = fileName // Direct path in bucket root
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage with metadata
       const { data, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, photoFile, {
           cacheControl: '3600',
-          upsert: true
+          upsert: true,
+          contentType: photoFile.type
         })
 
       if (uploadError) {
@@ -124,7 +150,7 @@ export default function ProfilePage() {
       return publicUrl
     } catch (err: any) {
       console.error('Error uploading photo:', err)
-      setError(err.message || 'Failed to upload photo')
+      setError(err.message || 'Failed to upload photo. Please check your permissions.')
       return null
     } finally {
       setUploading(false)
@@ -314,7 +340,7 @@ export default function ProfilePage() {
                     )}
                   </div>
                   <p className="text-xs text-gray-500">
-                    Recommended: Square image, good lighting, clear face visibility. Max size: 5MB
+                    For best 3D avatar results: Use a clear, well-lit photo with your full face visible. Minimum 512x512 pixels recommended. Max size: 10MB
                   </p>
                 </div>
               </div>
