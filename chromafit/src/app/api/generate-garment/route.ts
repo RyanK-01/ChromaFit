@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import OpenAI from 'openai'
+import { VertexAI } from '@google-cloud/vertexai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// Initialize Vertex AI
+const vertexAI = new VertexAI({
+  project: process.env.GOOGLE_CLOUD_PROJECT_ID || '',
+  location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
 })
+
+// Helper function to convert image URL to base64
+async function urlToBase64(url: string): Promise<{ data: string; mimeType: string }> {
+  const response = await fetch(url)
+  const buffer = await response.arrayBuffer()
+  const base64 = Buffer.from(buffer).toString('base64')
+  const mimeType = response.headers.get('content-type') || 'image/jpeg'
+  return { data: base64, mimeType }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,70 +43,80 @@ export async function POST(request: NextRequest) {
     console.log('Category:', category)
     console.log('Photo URL:', photoUrl)
 
-    // Step 1: Analyze the garment photo with GPT-4 Vision
-    console.log('Step 1: Analyzing garment with GPT-4 Vision...')
-    const visionResponse = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Analyze this ${category || 'clothing item'} and describe it in detail for a fashion catalog. Include:
+    // Step 1: Analyze the garment photo with Vertex AI Gemini Vision
+    console.log('Step 1: Analyzing garment with Vertex AI Gemini Vision...')
+    
+    const { data: base64Image, mimeType } = await urlToBase64(photoUrl)
+    const generativeVisionModel = vertexAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+    })
+    
+    const visionRequest = {
+      contents: [{
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              data: base64Image,
+              mimeType
+            }
+          },
+          {
+            text: `Analyze this ${category || 'clothing item'} and describe it in detail for a fashion catalog. Include:
 - Type of garment and style
 - Color(s) and patterns
 - Fabric texture and material appearance
 - Design details (buttons, zippers, pockets, etc.)
 - Overall aesthetic and vibe
 
-Describe it as if you're creating a professional product listing. Be specific and detailed.`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: photoUrl,
-              },
-            },
-          ],
-        },
-      ],
-      max_tokens: 500,
-    })
-
-    const analysis = visionResponse.choices[0].message.content
-    console.log('Vision analysis complete:', analysis?.substring(0, 100) + '...')
-
-    // Step 2: Generate enhanced garment image with DALL-E 3
-    console.log('Step 2: Generating enhanced image with DALL-E 3...')
-    const enhancedPrompt = `Professional fashion photography of a ${category || 'clothing item'} on a clean white background. High-end product photo style, studio lighting, sharp focus on fabric details and texture. ${analysis}
-
-Style: Professional product photography, magazine quality, centered composition, no model, just the garment displayed elegantly.`
-
-    console.log('DALL-E prompt:', enhancedPrompt)
-
-    const imageResponse = await openai.images.generate({
-      model: 'dall-e-3',
-      prompt: enhancedPrompt,
-      n: 1,
-      size: '1024x1024',
-      quality: 'hd',
-      style: 'natural',
-    })
-
-    const generatedImageUrl = imageResponse.data?.[0]?.url
-
-    if (!generatedImageUrl) {
-      throw new Error('No image URL received from DALL-E')
+Describe it as if you're creating a professional product listing. Be specific and detailed.`
+          }
+        ]
+      }]
     }
 
-    console.log('AI garment generated successfully')
+    const visionResult = await generativeVisionModel.generateContent(visionRequest)
+    const analysis = visionResult.response.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    console.log('Vision analysis complete:', analysis?.substring(0, 100) + '...')
+
+    // Step 2: Generate enhanced garment description
+    console.log('Step 2: Generating enhanced product description with Vertex AI Gemini...')
+    const enhancedPrompt = `Create a professional fashion catalog description for this ${category || 'clothing item'}:
+
+Analysis: ${analysis}
+
+Include:
+1. Detailed product name and category
+2. Style and design features
+3. Color palette and patterns
+4. Material and texture details
+5. Styling suggestions
+6. Ideal occasions to wear
+
+Write it in a professional, engaging tone suitable for an online fashion store.`
+
+    const generativeTextModel = vertexAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+    })
+
+    const textRequest = {
+      contents: [{
+        role: 'user',
+        parts: [{ text: enhancedPrompt }]
+      }]
+    }
+
+    const descriptionResult = await generativeTextModel.generateContent(textRequest)
+    const productDescription = descriptionResult.response.candidates?.[0]?.content?.parts?.[0]?.text || ''
+
+    console.log('AI garment description generated successfully with Vertex AI')
 
     return NextResponse.json({
       success: true,
-      generatedImageUrl,
+      productDescription,
       analysis,
       prompt: enhancedPrompt,
+      note: 'Vertex AI Gemini provides detailed product descriptions. For image enhancement, integrate with Imagen API or use the description with product photography tools.'
     })
   } catch (error: any) {
     console.error('Error generating AI garment:', error)
@@ -108,9 +129,9 @@ Style: Professional product photography, magazine quality, centered composition,
       )
     }
 
-    if (error.status === 401) {
+    if (error.status === 401 || error.message?.includes('API key') || error.message?.includes('credentials')) {
       return NextResponse.json(
-        { error: 'OpenAI API authentication failed. Please check your API key.' },
+        { error: 'Vertex AI authentication failed. Please check your Google Cloud credentials.' },
         { status: 500 }
       )
     }

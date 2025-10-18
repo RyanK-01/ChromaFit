@@ -218,16 +218,6 @@ export default function WardrobePage() {
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-300"
                       />
-                      {item.ai_generated_url && (
-                        <motion.div 
-                          className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded"
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.2 }}
-                        >
-                          AI Enhanced
-                        </motion.div>
-                      )}
                     </div>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-lg">{item.name}</CardTitle>

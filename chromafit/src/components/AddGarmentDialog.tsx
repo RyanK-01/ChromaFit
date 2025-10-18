@@ -27,7 +27,6 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -39,36 +38,26 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    // Validate file type - Accept all common image formats
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/bmp']
     if (!allowedTypes.includes(file.type)) {
-      setError('Please select a valid image file (JPEG, PNG, or WebP)')
+      setError('Please select a valid image file')
       return
     }
 
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('Image size should be less than 10MB')
+    // Validate file size (20MB max - increased from 10MB)
+    if (file.size > 20 * 1024 * 1024) {
+      setError('Image size should be less than 20MB')
       return
     }
 
     setPhotoFile(file)
+    setError('')
     
     // Create preview
     const reader = new FileReader()
     reader.onloadend = () => {
-      const img = new window.Image()
-      img.onload = () => {
-        if (img.width < 512 || img.height < 512) {
-          setError('For best results, please use an image at least 512x512 pixels')
-          setPhotoFile(null)
-          setPhotoPreview(null)
-          return
-        }
-        setPhotoPreview(reader.result as string)
-        setError('')
-      }
-      img.src = reader.result as string
+      setPhotoPreview(reader.result as string)
     }
     reader.readAsDataURL(file)
   }
@@ -103,6 +92,11 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
   }
 
   const generateAIGarment = async (originalPhotoUrl: string): Promise<string | null> => {
+    // AI generation disabled - no longer needed
+    console.log('AI generation skipped for garment upload')
+    return null
+    
+    /* Original AI generation code - commented out
     setGenerating(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -165,6 +159,7 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
     } finally {
       setGenerating(false)
     }
+    */
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -195,9 +190,8 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
         throw new Error('Failed to upload photo')
       }
 
-      // Generate AI-enhanced version
-      setSuccess('Generating AI-enhanced version...')
-      const aiGeneratedUrl = await generateAIGarment(originalPhotoUrl)
+      // Skip AI generation - just use the original photo
+      console.log('AI generation disabled - using original photo only')
 
       // Save to database
       const { error: insertError } = await supabase
@@ -207,7 +201,7 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
           name: name,
           category: category,
           original_photo_url: originalPhotoUrl,
-          ai_generated_url: aiGeneratedUrl,
+          ai_generated_url: null, // No AI generation
           brand: brand || null,
           size: size || null,
           color: color || null,
@@ -246,8 +240,8 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -278,12 +272,10 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
                   ) : (
                     <Camera className="h-16 w-16 text-gray-400" />
                   )}
-                  {(uploading || generating) && (
+                  {uploading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-50">
                       <Loader2 className="h-12 w-12 animate-spin text-white" />
-                      <p className="text-white mt-2 text-sm">
-                        {generating ? 'Generating AI version...' : 'Uploading...'}
-                      </p>
+                      <p className="text-white mt-2 text-sm">Uploading...</p>
                     </div>
                   )}
                 </div>
@@ -303,7 +295,7 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
                   />
                 </label>
                 <p className="text-xs text-gray-500 text-center">
-                  Clear photo on plain background recommended. Min 512x512px, max 10MB.
+                  Upload any image file (JPEG, PNG, WebP, GIF). Max 20MB.
                 </p>
               </div>
             </div>
@@ -435,19 +427,19 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
                 variant="outline"
                 onClick={handleClose}
                 className="flex-1"
-                disabled={uploading || generating}
+                disabled={uploading}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 className="flex-1"
-                disabled={uploading || generating || !photoFile || !name}
+                disabled={uploading || !photoFile || !name}
               >
-                {uploading || generating ? (
+                {uploading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {generating ? 'Generating...' : 'Adding...'}
+                    Adding...
                   </>
                 ) : (
                   'Add to Wardrobe'

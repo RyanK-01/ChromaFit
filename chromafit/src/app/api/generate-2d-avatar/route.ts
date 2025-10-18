@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { VertexAI } from '@google-cloud/vertexai'
+
+// Initialize Vertex AI
+const vertexAI = new VertexAI({
+  project: process.env.GOOGLE_CLOUD_PROJECT_ID || '',
+  location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
+})
 
 // Server-side Supabase client with service role key
 const supabaseAdmin = createClient(
@@ -13,18 +20,18 @@ const supabaseAdmin = createClient(
   }
 )
 
-interface OpenAIResponse {
-  created: number
-  data: Array<{
-    url?: string
-    b64_json?: string
-    revised_prompt?: string
-  }>
+// Helper function to convert image URL to base64
+async function urlToBase64(url: string): Promise<{ data: string; mimeType: string }> {
+  const response = await fetch(url)
+  const buffer = await response.arrayBuffer()
+  const base64 = Buffer.from(buffer).toString('base64')
+  const mimeType = response.headers.get('content-type') || 'image/jpeg'
+  return { data: base64, mimeType }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { photoUrl, userId, style = 'realistic', useVision = true } = await request.json()
+    const { photoUrl, userId, style = 'realistic' } = await request.json()
 
     if (!photoUrl || !userId) {
       return NextResponse.json(
@@ -33,157 +40,92 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check OpenAI API configuration
-    const apiKey = process.env.OPENAI_API_KEY
+    // Check Vertex AI configuration
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID
 
-    if (!apiKey) {
+    if (!projectId) {
       return NextResponse.json(
-        { error: 'OpenAI API is not configured' },
+        { error: 'Vertex AI is not configured. Please set GOOGLE_CLOUD_PROJECT_ID.' },
         { status: 500 }
       )
     }
 
-    let generatedImageUrl: string | null = null
-
-    // Try GPT-4 Vision + DALL-E approach if enabled
-    if (useVision) {
-      try {
-        console.log('Using GPT-4 Vision + DALL-E approach...')
-        generatedImageUrl = await generateWithVision(photoUrl, style, apiKey)
-      } catch (visionError) {
-        console.error('Vision approach failed, falling back to basic DALL-E:', visionError)
-      }
+    console.log('Using Vertex AI Gemini Vision approach...')
+    
+    // Step 1: Analyze photo with Vertex AI Gemini Vision
+    const { data: base64Image, mimeType } = await urlToBase64(photoUrl)
+    
+    const generativeVisionModel = vertexAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+    })
+    
+    const visionRequest = {
+      contents: [{
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              data: base64Image,
+              mimeType
+            }
+          },
+          {
+            text: `Describe this person's appearance in detail for creating a 2D avatar suitable for virtual fashion try-on. Focus on facial features, skin tone, hair style and color, and overall appearance. Keep it concise and suitable for avatar creation.`
+          }
+        ]
+      }]
     }
 
-    // Fallback to basic DALL-E if vision failed or not enabled
-    if (!generatedImageUrl) {
-      console.log('Using basic DALL-E generation...')
-      generatedImageUrl = await generateBasic(photoUrl, style, apiKey)
+    const visionResult = await generativeVisionModel.generateContent(visionRequest)
+    const description = visionResult.response.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // Step 2: Generate avatar description
+    const styleInstructions: Record<string, string> = {
+      realistic: 'photorealistic style',
+      illustration: 'modern illustration style',
+      cartoon: 'friendly cartoon style'
     }
 
-    if (generatedImageUrl) {
-      return NextResponse.json({
-        success: true,
-        generatedImageUrl: generatedImageUrl,
-        message: '2D avatar generated successfully with OpenAI'
-      })
+    const generativeTextModel = vertexAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+    })
+
+    const prompt = `Create a detailed description for a ${styleInstructions[style] || 'photorealistic style'} 2D portrait avatar based on: ${description}. 
+    
+The avatar should be:
+- Front-facing view
+- Neutral expression
+- Plain white background
+- Waist-up shot
+- Suitable for virtual clothing try-on overlay
+
+Provide specific details about the avatar's appearance, pose, and style.`
+
+    const textRequest = {
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }]
     }
 
-    return NextResponse.json(
-      { error: 'Failed to generate 2D avatar' },
-      { status: 500 }
-    )
+    const avatarResult = await generativeTextModel.generateContent(textRequest)
+    const avatarDescription = avatarResult.response.candidates?.[0]?.content?.parts?.[0]?.text || ''
+
+    console.log('Avatar description generated with Vertex AI Gemini')
+
+    return NextResponse.json({
+      success: true,
+      avatarDescription,
+      personAnalysis: description,
+      message: '2D avatar description generated successfully with Vertex AI Gemini',
+      note: 'Vertex AI Gemini provides text descriptions. To generate actual avatar images, integrate with Imagen API or use a 3rd party avatar generation service.'
+    })
+    
   } catch (error: any) {
     console.error('Error in generate-2d-avatar API:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to generate 2D avatar' },
+      { error: error.message || 'Failed to generate 2D avatar description' },
       { status: 500 }
     )
   }
-}
-
-async function generateWithVision(
-  photoUrl: string,
-  style: string,
-  apiKey: string
-): Promise<string | null> {
-  // Step 1: Analyze photo with GPT-4 Vision
-  const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4-vision-preview',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Describe this person\'s appearance in detail for creating a 2D avatar suitable for virtual fashion try-on. Focus on facial features, skin tone, hair style and color, and overall appearance. Keep it concise and suitable for image generation.'
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: photoUrl
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 300
-    }),
-  })
-
-  if (!visionResponse.ok) {
-    throw new Error('GPT-4 Vision request failed')
-  }
-
-  const visionData = await visionResponse.json()
-  const description = visionData.choices[0]?.message?.content || ''
-
-  // Step 2: Generate image with DALL-E
-  const styleInstructions: Record<string, string> = {
-    realistic: 'photorealistic style',
-    illustration: 'modern illustration style',
-    cartoon: 'friendly cartoon style'
-  }
-
-  const prompt = `Create a ${styleInstructions[style] || 'photorealistic style'} 2D portrait for virtual fashion try-on: ${description}. Front-facing view, neutral expression, plain white background, waist-up shot, suitable for clothing overlay.`
-
-  return generateImageWithDallE(prompt, apiKey, 'hd')
-}
-
-async function generateBasic(
-  photoUrl: string,
-  style: string,
-  apiKey: string
-): Promise<string | null> {
-  const stylePrompts: Record<string, string> = {
-    realistic: 'Create a photorealistic 2D portrait suitable for virtual fashion try-on. Front-facing view with neutral expression and plain white background.',
-    illustration: 'Create a stylized illustrated portrait suitable for virtual fashion try-on. Clean lines and modern illustration style with neutral expression.',
-    cartoon: 'Create a friendly cartoon-style portrait suitable for virtual fashion try-on. Bold colors and simple shapes with neutral expression.'
-  }
-
-  const prompt = stylePrompts[style] || stylePrompts.realistic
-
-  return generateImageWithDallE(prompt, apiKey, 'standard')
-}
-
-async function generateImageWithDallE(
-  prompt: string,
-  apiKey: string,
-  quality: 'standard' | 'hd' = 'standard'
-): Promise<string | null> {
-  const response = await fetch('https://api.openai.com/v1/images/generations', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'dall-e-3',
-      prompt: prompt,
-      n: 1,
-      size: '1024x1024',
-      quality: quality,
-      response_format: 'url'
-    }),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error('DALL-E API error:', response.status, errorText)
-    throw new Error(`DALL-E API failed with status ${response.status}`)
-  }
-
-  const data: OpenAIResponse = await response.json()
-
-  if (data.data && data.data.length > 0) {
-    return data.data[0].url || null
-  }
-
-  return null
 }

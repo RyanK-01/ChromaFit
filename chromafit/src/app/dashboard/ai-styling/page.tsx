@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Sparkles, Download, Save, Star, Trash2 } from 'lucide-react'
+import { Loader2, Sparkles, Download, Save, Star, Trash2, ArrowLeft } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 import type { EnvironmentType, OccasionType, WardrobeItem, StyledOutfit } from '@/types'
 
 export default function AIStylingPage() {
@@ -19,6 +20,9 @@ export default function AIStylingPage() {
   const [generating, setGenerating] = useState(false)
   const [generatedImage, setGeneratedImage] = useState<string | null>(null)
   const [promptUsed, setPromptUsed] = useState<string | null>(null)
+  const [outfitRecommendation, setOutfitRecommendation] = useState<string | null>(null)
+  const [userDescription, setUserDescription] = useState<string | null>(null)
+  const [source, setSource] = useState<string>('')
   const [savedOutfits, setSavedOutfits] = useState<StyledOutfit[]>([])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -110,7 +114,15 @@ export default function AIStylingPage() {
       const data = await response.json()
       setGeneratedImage(data.styledImageUrl)
       setPromptUsed(data.promptUsed)
-      setSuccess('Styled outfit generated successfully! You can save it below.')
+      setOutfitRecommendation(data.outfitRecommendation)
+      setUserDescription(data.userDescription)
+      setSource(data.source || 'unknown')
+      
+      if (data.source === 'vertex-ai-gemini') {
+        setSuccess('✨ AI-powered personalized styling generated!')
+      } else {
+        setSuccess('✅ Expert styling recommendations ready!')
+      }
     } catch (err: any) {
       console.error('Error generating styled outfit:', err)
       setError(err.message || 'Failed to generate styled outfit')
@@ -205,18 +217,35 @@ export default function AIStylingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-2">
-            <Sparkles className="h-8 w-8 text-purple-600" />
-            <h1 className="text-3xl font-bold text-gray-900">AI Styling</h1>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header - Match Wardrobe Style */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Link href="/dashboard">
+                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                  <ArrowLeft className="h-5 w-5 mr-2" />
+                  Back to Dashboard
+                </Button>
+              </Link>
+              <div className="border-l h-8"></div>
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 p-2 rounded-lg">
+                  <Sparkles className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">AI Styling Assistant</h1>
+                  <p className="text-gray-600 mt-1">Get personalized outfit recommendations powered by Vertex AI</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="text-gray-600">
-            Generate AI-styled outfit images for any occasion or environment
-          </p>
         </div>
+      </div>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {!hasRealisticPhoto && (
           <Alert className="mb-6 border-yellow-500 bg-yellow-50">
@@ -350,55 +379,75 @@ export default function AIStylingPage() {
               {generating ? (
                 <>
                   <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Generating AI Styled Outfit...
+                  Generating AI Image...
                 </>
               ) : (
                 <>
                   <Sparkles className="h-5 w-5 mr-2" />
-                  Generate Styled Outfit
+                  Generate Styled Outfit Image
                 </>
               )}
             </Button>
             <p className="text-xs text-gray-500 text-center">
-              Generation takes 15-25 seconds • ~$0.08 per image
+              Generation takes 20-30 seconds • Click multiple times for different style variations
+            </p>
+            <p className="text-xs text-blue-600 text-center font-medium">
+              💡 Each generation creates a unique styling variation!
             </p>
           </div>
 
-          {/* Right Column - Generated Image */}
+          {/* Right Column - AI Generated Styled Image */}
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Generated Styled Outfit</CardTitle>
-                <CardDescription>Your AI-styled look for the selected occasion</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  AI Generated Styled Outfit
+                  {source === 'vertex-ai-imagen' && (
+                    <span className="text-sm font-normal text-green-600">• AI-Powered</span>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {source === 'vertex-ai-imagen' 
+                    ? 'AI-generated image of you in a styled outfit'
+                    : 'Your styled outfit visualization'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="relative w-full h-96 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                <div className="relative w-full aspect-[2/3] bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden">
                   {generatedImage ? (
                     <Image
                       src={generatedImage}
-                      alt="Generated styled outfit"
+                      alt="AI Generated Styled Outfit"
                       fill
-                      className="object-contain"
+                      className="object-cover"
+                      priority
                     />
                   ) : (
-                    <div className="text-center p-8">
-                      <Sparkles className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">
-                        Your generated styled outfit will appear here
-                      </p>
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center p-8">
+                        <Sparkles className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600 font-medium">
+                          Your styled outfit image will appear here
+                        </p>
+                        <p className="text-sm text-gray-400 mt-2">
+                          Select environment/occasion and click generate
+                        </p>
+                      </div>
                     </div>
                   )}
                   {generating && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-50">
-                      <Loader2 className="h-16 w-16 animate-spin text-white" />
-                      <p className="text-white mt-4 text-lg">Generating your styled outfit...</p>
-                      <p className="text-white text-sm mt-2">This may take 15-25 seconds</p>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm">
+                      <Loader2 className="h-16 w-16 animate-spin text-white mb-4" />
+                      <p className="text-white font-semibold text-lg">Generating your styled outfit...</p>
+                      <p className="text-white/80 text-sm mt-2">Creating AI-powered fashion image</p>
+                      <p className="text-white/60 text-xs mt-1">This may take 20-30 seconds</p>
                     </div>
                   )}
                 </div>
 
+                {/* Action Buttons */}
                 {generatedImage && (
-                  <div className="mt-4 flex space-x-3">
+                  <div className="mt-4 flex gap-3">
                     <Button
                       onClick={handleSave}
                       className="flex-1"
@@ -416,6 +465,18 @@ export default function AIStylingPage() {
                       Download
                     </Button>
                   </div>
+                )}
+
+                {/* Styling Details (collapsible) */}
+                {outfitRecommendation && generatedImage && (
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-blue-600 p-3 bg-gray-50 rounded-lg">
+                      📋 View Styling Details
+                    </summary>
+                    <div className="mt-2 p-4 bg-blue-50 rounded-lg text-sm text-gray-700 whitespace-pre-wrap">
+                      {outfitRecommendation}
+                    </div>
+                  </details>
                 )}
               </CardContent>
             </Card>
@@ -470,7 +531,7 @@ export default function AIStylingPage() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }

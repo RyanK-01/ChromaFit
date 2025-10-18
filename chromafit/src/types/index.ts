@@ -114,3 +114,69 @@ export interface StyleRequest {
   selectedItems?: string[]
   customPrompt?: string
 }
+
+// Garment Types
+export type GarmentCategory = 
+  | 't-shirt'
+  | 'jeans'
+  | 'dress'
+  | 'shirt'
+  | 'pants'
+  | 'shorts'
+  | 'jacket'
+  | 'sweater'
+  | 'skirt'
+  | 'shoes'
+  | 'accessories'
+
+export interface Garment {
+  id: string
+  user_id: string
+  name: string
+  category: GarmentCategory
+  image_url: string
+  measurements: GarmentMeasurements | null
+  clip_embedding: number[] | null
+  source_type: 'upload' | 'url'
+  source_url: string | null
+  created_at: string
+}
+
+export interface GarmentMeasurements {
+  chest?: number
+  waist?: number
+  hips?: number
+  length?: number
+  sleeve_length?: number
+  inseam?: number
+  unit: 'cm' | 'inches'
+}
+
+// Try-On Types
+export interface TryOn {
+  id: string
+  user_id: string
+  garment_id: string
+  result_image_url: string | null
+  fit_score: number
+  fit_explanation: FitExplanation | null
+  created_at: string
+  garments?: Garment
+}
+
+export interface FitExplanation {
+  fit: string
+  style: string
+  comfort: string
+}
+
+export interface TryOnGenerateRequest {
+  userId: string
+  garmentId: string
+}
+
+export interface TryOnGenerateResponse {
+  resultImageUrl: string
+  fitScore: number
+  explanation: FitExplanation
+}
