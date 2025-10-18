@@ -1,14 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
+import { WardrobeItem } from '@/types';
+import Bottleneck from 'bottleneck';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+// Create a rate limiter instance
+const limiter = new Bottleneck({
+  maxConcurrent: 1,
+  reservoir: 1, // Allow 1 request
+  reservoirRefreshAmount: 1,
+  reservoirRefreshInterval: 60 * 1000, // Refresh every 60 seconds
+});
+
+// Wrap OpenAI API calls with the rate limiter
+const limitedGenerateImage = limiter.wrap(async (prompt: string) => {
+  return await openai.images.generate({
+    model: 'dall-e-2',
+    prompt,
+    n: 1,
+    size: '1024x1024',
+  });
+});
+
 export async function POST(request: NextRequest) {
   try {
-    const { environmentType, occasionType, selectedItems, customPrompt } = await request.json()
+    const { environmentType, occasionType, selectedItems, customPrompt, gender } = await request.json()
 
     const supabase = await createClient()
 
@@ -26,19 +46,7 @@ export async function POST(request: NextRequest) {
     console.log('Occasion:', occasionType)
     console.log('Selected items:', selectedItems?.length || 0)
 
-    // Get user's realistic photo
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('realistic_photo_url, display_name')
-      .eq('user_id', user.id)
-      .single()
-
-    if (profileError || !profile?.realistic_photo_url) {
-      return NextResponse.json(
-        { error: 'Please upload a photo in your profile first to generate styled outfits' },
-        { status: 400 }
-      )
-    }
+    console.log('Generating outfit without user profile photo...')
 
     // Get wardrobe items if selected
     let wardrobeDetails = ''
@@ -49,7 +57,7 @@ export async function POST(request: NextRequest) {
         .in('id', selectedItems)
 
       if (!itemsError && items) {
-        wardrobeDetails = items.map(item => 
+        wardrobeDetails = items.map((item: WardrobeItem) => 
           `${item.name} (${item.category}${item.color ? ', ' + item.color : ''}${item.brand ? ', ' + item.brand : ''})`
         ).join(', ')
       }
@@ -83,58 +91,75 @@ export async function POST(request: NextRequest) {
         : occasionDescriptions[occasionType] || occasionType
     }
 
-    // Build the complete prompt
-    const basePrompt = `Professional fashion photography of a person in a ${styleContext}. 
-${wardrobeDetails ? `Wearing: ${wardrobeDetails}.` : ''}
-${customPrompt || ''}
+    // Check if wardrobe items are sufficient
+    if (!wardrobeDetails) {
+      console.log('No suitable wardrobe items found. Generating outfit without user wardrobe.')
+      wardrobeDetails = 'AI-generated outfit based on the environment and occasion.'
+    }
 
-Style: High-quality fashion photography, full body shot, professional lighting, trendy and stylish, magazine quality, shows complete outfit from head to toe, appropriate for the occasion, well-coordinated colors and accessories.`
+    // Analyze profile photo for personalization
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('realistic_photo_url, display_name')
+      .eq('user_id', user.id)
+      .single()
 
-    console.log('DALL-E prompt:', basePrompt)
-
-    // Step 1: Analyze the user's photo with GPT-4 Vision
-    console.log('Step 1: Analyzing user photo with GPT-4 Vision...')
-    const visionResponse = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
+    let styleAnalysis = '';
+    if (!profileError && profile?.realistic_photo_url) {
+      console.log('Analyzing profile photo for style guidance...');
+      try {
+        const visionResponse = await openai.chat.completions.create({
+          model: 'gpt-4-vision-preview',
+          messages: [
             {
-              type: 'text',
-              text: `Analyze this person's appearance (body type, skin tone, hair, facial features) to help generate a styled outfit image for them. Describe their key physical characteristics that would be important for creating a realistic styled photo.`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: profile.realistic_photo_url,
-              },
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `Analyze this person's appearance focusing ONLY on styling-relevant details:
+                  1. Color palette that would complement their skin tone and features
+                  2. Suggested clothing cuts and styles that would suit their body type
+                  3. Any notable style preferences visible in their current outfit
+                  Be specific about colors, patterns, and cuts.`,
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: profile.realistic_photo_url,
+                  },
+                },
+              ],
             },
           ],
-        },
-      ],
-      max_tokens: 300,
-    })
+          max_tokens: 300,
+        });
 
-    const userDescription = visionResponse.choices[0].message.content
-    console.log('User description:', userDescription?.substring(0, 100) + '...')
+        styleAnalysis = visionResponse.choices[0].message.content || '';
+        console.log('Style analysis completed successfully');
+      } catch (error) {
+        console.error('Style analysis failed:', error);
+        styleAnalysis = '';
+      }
+    } else {
+      console.log('No profile photo available for analysis.');
+      styleAnalysis = '';
+    }
 
-    // Step 2: Generate styled outfit image with DALL-E 3
-    console.log('Step 2: Generating styled outfit image with DALL-E 3...')
-    const enhancedPrompt = `${basePrompt}
+    // Build the complete prompt
+    const prompt = `Clean, minimalist fashion flat lay of a ${gender || 'unisex'} outfit for ${styleContext}. Professional product photography on pure white background, no text or graphic elements. Weather-appropriate separates arranged in a symmetrical star pattern.${
+      wardrobeDetails ? ` Include: ${wardrobeDetails}.` : ''
+    }${
+      styleAnalysis ? ` Style guide: ${styleAnalysis}` : ''
+    }${
+      customPrompt ? ` Consider weather conditions: ${customPrompt}. ` : ''
+    }Show 3-4 coordinated clothing pieces plus 2-3 relevant accessories, perfectly spaced. Elegant product photography focusing only on the garments and accessories.`
 
-Person characteristics: ${userDescription}
+    console.log('DALL-E prompt:', prompt)
 
-Create a photorealistic full-body fashion photograph showing this person wearing an appropriate outfit for the described occasion. Ensure the outfit matches the style requirements and looks natural on the person.`
+    // Generate the outfit image
+    console.log('Generating flat-lay outfit image with DALL-E 2...')
 
-    const imageResponse = await openai.images.generate({
-      model: 'dall-e-3',
-      prompt: enhancedPrompt,
-      n: 1,
-      size: '1024x1024',
-      quality: 'hd',
-      style: 'natural',
-    })
+    const imageResponse = await limitedGenerateImage(prompt);
 
     const generatedImageUrl = imageResponse.data?.[0]?.url
 
@@ -144,9 +169,41 @@ Create a photorealistic full-body fashion photograph showing this person wearing
 
     console.log('Styled outfit generated successfully')
 
-    // Download and save to Supabase storage
-    const imageResponse2 = await fetch(generatedImageUrl)
-    const blob = await imageResponse2.blob()
+    // Download and save to Supabase storage with retries
+    let blob;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
+        console.log(`Attempt ${attempt} to download image...`);
+        const imageResponse2 = await fetch(generatedImageUrl, {
+          signal: controller.signal
+        });
+        
+        if (!imageResponse2.ok) {
+          throw new Error(`HTTP error! status: ${imageResponse2.status}`);
+        }
+        
+        blob = await imageResponse2.blob();
+        clearTimeout(timeoutId);
+        console.log('Image downloaded successfully');
+        break;
+      } catch (error: any) {
+        console.error(`Attempt ${attempt} failed:`, error.message);
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to download image after ${maxRetries} attempts: ${error.message}`);
+        }
+        // Wait before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      }
+    }
+
+    if (!blob) {
+      throw new Error('Failed to download image');
+    }
     
     const fileName = `${user.id}-styled-${Date.now()}.png`
 
@@ -164,7 +221,7 @@ Create a photorealistic full-body fashion photograph showing this person wearing
       return NextResponse.json({
         success: true,
         styledImageUrl: generatedImageUrl,
-        promptUsed: enhancedPrompt,
+        promptUsed: prompt,
         temporary: true
       })
     }
@@ -176,8 +233,8 @@ Create a photorealistic full-body fashion photograph showing this person wearing
     return NextResponse.json({
       success: true,
       styledImageUrl: publicUrl,
-      promptUsed: enhancedPrompt,
-      userDescription
+      promptUsed: prompt,
+      styleAnalysis
     })
   } catch (error: any) {
     console.error('Error generating styled outfit:', error)
