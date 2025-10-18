@@ -203,38 +203,35 @@ export default function AIStylingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back to Dashboard Button */}
-        <header className="bg-white shadow-sm mb-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Link href="/dashboard">
-                  <Button variant="ghost" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Dashboard
-                  </Button>
-                </Link>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Link href="/dashboard">
+                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                  <ArrowLeft className="h-5 w-5 mr-2" />
+                  Back to Dashboard
+                </Button>
+              </Link>
+              <div className="border-l h-8"></div>
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-100 p-2 rounded-lg">
+                  <Sparkles className="h-6 w-6 text-purple-600" />
+                </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">AI Styling</h1>
-                  <p className="text-sm text-gray-600">Generate personalized outfit suggestions</p>
+                  <h1 className="text-3xl font-bold text-gray-900">AI Styling</h1>
+                  <p className="text-gray-600 mt-1">Generate personalized outfit suggestions</p>
                 </div>
               </div>
             </div>
           </div>
-        </header>
-
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-2">
-            <Sparkles className="h-8 w-8 text-purple-600" />
-            <h1 className="text-3xl font-bold text-gray-900">AI Styling</h1>
-          </div>
-          <p className="text-gray-600">
-            Generate AI-styled outfit images for any occasion or environment
-          </p>
         </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {!hasRealisticPhoto && (
           <Alert className="mb-6 border-yellow-500 bg-yellow-50">
@@ -250,7 +247,7 @@ export default function AIStylingPage() {
             {/* Environment Selection */}
             <Card>
               <CardHeader>
-                <CardTitle>Select Environment</CardTitle>
+                <CardTitle>Select Environment (Optional)</CardTitle>
                 <CardDescription>Choose where you'll be wearing this outfit</CardDescription>
               </CardHeader>
               <CardContent>
@@ -259,7 +256,7 @@ export default function AIStylingPage() {
                     <Button
                       key={env}
                       variant={environmentType === env ? 'default' : 'outline'}
-                      onClick={() => setEnvironmentType(env)}
+                      onClick={() => setEnvironmentType(environmentType === env ? '' : env)}
                       className="capitalize"
                     >
                       {env}
@@ -272,7 +269,7 @@ export default function AIStylingPage() {
             {/* Gender Selection */}
             <Card>
               <CardHeader>
-                <CardTitle>Select Style Preference</CardTitle>
+                <CardTitle>Select Style Preference (Optional)</CardTitle>
                 <CardDescription>Choose your preferred style direction</CardDescription>
               </CardHeader>
               <CardContent>
@@ -281,7 +278,7 @@ export default function AIStylingPage() {
                     <Button
                       key={g}
                       variant={gender === g ? 'default' : 'outline'}
-                      onClick={() => setGender(g)}
+                      onClick={() => setGender(gender === g ? '' : g)}
                       className="capitalize"
                     >
                       {g}
@@ -294,7 +291,7 @@ export default function AIStylingPage() {
             {/* Occasion Selection */}
             <Card>
               <CardHeader>
-                <CardTitle>Select Occasion</CardTitle>
+                <CardTitle>Select Occasion (Optional)</CardTitle>
                 <CardDescription>Choose the specific event or activity</CardDescription>
               </CardHeader>
               <CardContent>
@@ -303,7 +300,7 @@ export default function AIStylingPage() {
                     <Button
                       key={occ}
                       variant={occasionType === occ ? 'default' : 'outline'}
-                      onClick={() => setOccasionType(occ)}
+                      onClick={() => setOccasionType(occasionType === occ ? '' : occ)}
                       className="capitalize"
                     >
                       {occ}
