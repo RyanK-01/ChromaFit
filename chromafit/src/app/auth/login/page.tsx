@@ -34,11 +34,11 @@ export default function LoginPage() {
         // Check if user has completed onboarding (has avatar)
         const { data: profile } = await supabase
           .from('profiles')
-          .select('avatar_image_url')
-          .eq('id', data.user.id)
+          .select('avatar_photo_url')
+          .eq('user_id', data.user.id)
           .single()
 
-        if (profile?.avatar_image_url) {
+        if (profile?.avatar_photo_url) {
           router.push('/dashboard')
         } else {
           router.push('/onboarding')

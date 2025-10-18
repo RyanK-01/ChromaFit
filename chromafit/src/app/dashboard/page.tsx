@@ -92,7 +92,11 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full" variant="outline">
+              <Button 
+                className="w-full" 
+                variant="outline"
+                onClick={() => router.push('/profile')}
+              >
                 View Profile
               </Button>
             </CardContent>
