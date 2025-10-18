@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
+import { WardrobeItem } from '@/types';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
         .in('id', selectedItems)
 
       if (!itemsError && items) {
-        wardrobeDetails = items.map(item => 
+        wardrobeDetails = items.map((item: WardrobeItem) => 
           `${item.name} (${item.category}${item.color ? ', ' + item.color : ''}${item.brand ? ', ' + item.brand : ''})`
         ).join(', ')
       }
@@ -83,12 +84,19 @@ export async function POST(request: NextRequest) {
         : occasionDescriptions[occasionType] || occasionType
     }
 
+    // Check if wardrobe items are sufficient
+    if (!wardrobeDetails) {
+      console.log('No suitable wardrobe items found. Generating outfit without user wardrobe.')
+      wardrobeDetails = 'AI-generated outfit based on the environment and occasion.'
+    }
+
     // Build the complete prompt
-    const basePrompt = `Professional fashion photography of a person in a ${styleContext}. 
-${wardrobeDetails ? `Wearing: ${wardrobeDetails}.` : ''}
+    const basePrompt = `Professional fashion photography of clothing items for a ${styleContext}. 
+${wardrobeDetails ? `Clothing: ${wardrobeDetails}.` : ''}
 ${customPrompt || ''}
 
-Style: High-quality fashion photography, full body shot, professional lighting, trendy and stylish, magazine quality, shows complete outfit from head to toe, appropriate for the occasion, well-coordinated colors and accessories.`
+Style: High-quality fashion photography, trendy and stylish, magazine quality, shows complete outfit appropriate for the occasion, well-coordinated colors and accessories. 
+Constraints: The clothing should be widely available, practical, and not overly unique or avant-garde. Focus on styles that are accessible and commonly found in stores.`
 
     console.log('DALL-E prompt:', basePrompt)
 
