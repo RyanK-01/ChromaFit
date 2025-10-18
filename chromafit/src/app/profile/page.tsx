@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [generating2D, setGenerating2D] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   
@@ -92,9 +93,9 @@ export default function ProfilePage() {
     reader.onloadend = () => {
       const img = new window.Image()
       img.onload = () => {
-        // Recommend minimum dimensions for 3D model quality
+        // Recommend minimum dimensions for 2D avatar quality
         if (img.width < 512 || img.height < 512) {
-          setError('For best 3D avatar results, please use an image at least 512x512 pixels')
+          setError('For best 2D avatar results, please use an image at least 512x512 pixels')
           setPhotoFile(null)
           setPhotoPreview(null)
           return
@@ -105,6 +106,117 @@ export default function ProfilePage() {
       img.src = reader.result as string
     }
     reader.readAsDataURL(file)
+  }
+
+  const generate2DAvatar = async (originalPhotoUrl: string): Promise<string | null> => {
+    if (!user) return null
+
+    setGenerating2D(true)
+    try {
+      console.log('Generating 2D avatar with OpenAI...')
+      
+      // Call our API route to generate 2D image using OpenAI
+      const response = await fetch('/api/generate-2d-avatar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          photoUrl: originalPhotoUrl,
+          userId: user.id,
+          style: 'realistic',
+          useVision: true // Enable GPT-4 Vision for better results
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to generate 2D avatar')
+      }
+
+      const data = await response.json()
+      console.log('2D avatar generated successfully with OpenAI')
+      
+      if (data.generatedImageUrl) {
+        // OpenAI returns temporary URLs, so we need to download and upload to Supabase
+        if (data.generatedImageUrl.startsWith('http')) {
+          return await downloadAndUpload2DImage(data.generatedImageUrl)
+        }
+        // If it's a base64 image
+        if (data.generatedImageUrl.startsWith('data:image')) {
+          return await upload2DImageToStorage(data.generatedImageUrl)
+        }
+        return data.generatedImageUrl
+      }
+
+      throw new Error('No generated image URL received')
+    } catch (err: any) {
+      console.error('Error generating 2D avatar:', err)
+      setError(`2D generation: ${err.message}. Using original photo instead.`)
+      return originalPhotoUrl // Fallback to original photo
+    } finally {
+      setGenerating2D(false)
+    }
+  }
+
+  const downloadAndUpload2DImage = async (imageUrl: string): Promise<string> => {
+    // Download the image from OpenAI's temporary URL
+    const response = await fetch(imageUrl)
+    const blob = await response.blob()
+    
+    const fileName = `${user.id}-2d-${Date.now()}.png`
+
+    // Upload to Supabase
+    const { data, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: 'image/png'
+      })
+
+    if (uploadError) {
+      throw uploadError
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName)
+
+    return publicUrl
+  }
+
+  const upload2DImageToStorage = async (base64Image: string): Promise<string> => {
+    // Convert base64 to blob
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '')
+    const binaryString = atob(base64Data)
+    const bytes = new Uint8Array(binaryString.length)
+    
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    
+    const blob = new Blob([bytes], { type: 'image/png' })
+    const fileName = `${user.id}-2d-${Date.now()}.png`
+
+    // Upload to Supabase
+    const { data, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: 'image/png'
+      })
+
+    if (uploadError) {
+      throw uploadError
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName)
+
+    return publicUrl
   }
 
   const uploadPhoto = async () => {
@@ -166,10 +278,22 @@ export default function ProfilePage() {
     try {
       // Upload photo if changed
       let photoUrl = profile?.avatar_photo_url || null
+      let generated2DUrl = null
+      
       if (photoFile) {
         const uploadedUrl = await uploadPhoto()
         if (uploadedUrl) {
           photoUrl = uploadedUrl
+          
+          // Generate 2D avatar from uploaded photo
+          setSuccess('Photo uploaded! Generating 2D avatar...')
+          generated2DUrl = await generate2DAvatar(uploadedUrl)
+          
+          if (generated2DUrl) {
+            photoUrl = generated2DUrl // Use 2D avatar as the main avatar
+            setPhotoPreview(generated2DUrl) // Update preview
+            setSuccess('2D avatar generated successfully!')
+          }
         } else {
           setSaving(false)
           return // Stop if photo upload failed
@@ -288,7 +412,7 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle>Profile Photo</CardTitle>
               <CardDescription>
-                Upload a photo that will be used for your 3D avatar generation
+                Upload a photo to generate your 2D avatar for virtual styling
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -308,9 +432,14 @@ export default function ProfilePage() {
                       <Camera className="h-12 w-12 text-gray-400" />
                     )}
                   </div>
-                  {uploading && (
+                  {(uploading || generating2D) && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">
-                      <Loader2 className="h-8 w-8 animate-spin text-white" />
+                      <div className="text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-white mx-auto" />
+                        <p className="text-xs text-white mt-1">
+                          {uploading ? 'Uploading...' : 'Generating 2D...'}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -340,7 +469,7 @@ export default function ProfilePage() {
                     )}
                   </div>
                   <p className="text-xs text-gray-500">
-                    For best 3D avatar results: Use a clear, well-lit photo with your full face visible. Minimum 512x512 pixels recommended. Max size: 10MB
+                    For best 2D avatar results: Use a clear, well-lit photo with your full face visible. Minimum 512x512 pixels recommended. Max size: 10MB. Your photo will be processed to create a 2D avatar for virtual try-on.
                   </p>
                 </div>
               </div>
@@ -453,12 +582,12 @@ export default function ProfilePage() {
             </Button>
             <Button
               type="submit"
-              disabled={saving || uploading}
+              disabled={saving || uploading || generating2D}
             >
-              {saving || uploading ? (
+              {saving || uploading || generating2D ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
+                  {generating2D ? 'Generating 2D Avatar...' : 'Saving...'}
                 </>
               ) : (
                 'Save Changes'
