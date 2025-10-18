@@ -2,10 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
 import { WardrobeItem } from '@/types';
+import Bottleneck from 'bottleneck';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
+
+// Create a rate limiter instance
+const limiter = new Bottleneck({
+  maxConcurrent: 1, // Allow only 1 request at a time
+  minTime: 60000, // Enforce a 1-minute delay between requests
+});
+
+// Wrap OpenAI API calls with the rate limiter
+const limitedGenerateImage = limiter.wrap(async (prompt: string) => {
+  return await openai.images.generate({
+    model: 'dall-e-3',
+    prompt,
+    n: 1,
+    size: '1024x1024',
+    quality: 'hd',
+    style: 'natural',
+  });
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,19 +46,7 @@ export async function POST(request: NextRequest) {
     console.log('Occasion:', occasionType)
     console.log('Selected items:', selectedItems?.length || 0)
 
-    // Get user's realistic photo
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('realistic_photo_url, display_name')
-      .eq('user_id', user.id)
-      .single()
-
-    if (profileError || !profile?.realistic_photo_url) {
-      return NextResponse.json(
-        { error: 'Please upload a photo in your profile first to generate styled outfits' },
-        { status: 400 }
-      )
-    }
+    console.log('Generating outfit without user profile photo...')
 
     // Get wardrobe items if selected
     let wardrobeDetails = ''
@@ -90,13 +97,52 @@ export async function POST(request: NextRequest) {
       wardrobeDetails = 'AI-generated outfit based on the environment and occasion.'
     }
 
+    // Reintroduce profile photo for personalization
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('realistic_photo_url, display_name')
+      .eq('user_id', user.id)
+      .single()
+
+    let userDescription = '';
+    if (!profileError && profile?.realistic_photo_url) {
+      console.log('Using profile photo for personalization...');
+      const visionResponse = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Analyze this person's appearance (body type, skin tone, hair, facial features) to help generate a styled outfit image for them. Describe their key physical characteristics that would be important for creating a realistic styled photo.`,
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: profile.realistic_photo_url,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 300,
+      });
+
+      userDescription = visionResponse.choices[0].message.content || 'No user-specific details available. Generating a general outfit.';
+    } else {
+      console.log('No profile photo available or analysis failed.');
+      userDescription = 'No user-specific details available. Generating a general outfit.';
+    }
+
     // Build the complete prompt
     const basePrompt = `Professional fashion photography of clothing items for a ${styleContext}. 
 ${wardrobeDetails ? `Clothing: ${wardrobeDetails}.` : ''}
 ${customPrompt || ''}
 
-Style: High-quality fashion photography, trendy and stylish, magazine quality, shows complete outfit appropriate for the occasion, well-coordinated colors and accessories. 
-Constraints: The clothing should be widely available, practical, and not overly unique or avant-garde. Focus on styles that are accessible and commonly found in stores.`
+${userDescription}
+
+Style: High-quality fashion photography, trendy and stylish, magazine quality, shows complete outfit appropriate for the occasion, well-coordinated colors and accessories.`
 
     console.log('DALL-E prompt:', basePrompt)
 
@@ -107,42 +153,24 @@ Constraints: The clothing should be widely available, practical, and not overly 
       messages: [
         {
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Analyze this person's appearance (body type, skin tone, hair, facial features) to help generate a styled outfit image for them. Describe their key physical characteristics that would be important for creating a realistic styled photo.`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: profile.realistic_photo_url,
-              },
-            },
-          ],
+          content: `Analyze the requested environment and occasion to generate a styled outfit. Focus on clothing details only.`,
         },
       ],
       max_tokens: 300,
     })
 
-    const userDescription = visionResponse.choices[0].message.content
-    console.log('User description:', userDescription?.substring(0, 100) + '...')
+    const userDescription2 = visionResponse.choices[0].message.content
+    console.log('User description:', userDescription2?.substring(0, 100) + '...')
 
     // Step 2: Generate styled outfit image with DALL-E 3
     console.log('Step 2: Generating styled outfit image with DALL-E 3...')
     const enhancedPrompt = `${basePrompt}
 
-Person characteristics: ${userDescription}
+Person characteristics: ${userDescription2}
 
 Create a photorealistic full-body fashion photograph showing this person wearing an appropriate outfit for the described occasion. Ensure the outfit matches the style requirements and looks natural on the person.`
 
-    const imageResponse = await openai.images.generate({
-      model: 'dall-e-3',
-      prompt: enhancedPrompt,
-      n: 1,
-      size: '1024x1024',
-      quality: 'hd',
-      style: 'natural',
-    })
+    const imageResponse = await limitedGenerateImage(enhancedPrompt);
 
     const generatedImageUrl = imageResponse.data?.[0]?.url
 

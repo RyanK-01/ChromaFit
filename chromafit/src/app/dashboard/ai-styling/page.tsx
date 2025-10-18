@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Sparkles, Download, Save, Star, Trash2 } from 'lucide-react'
+import { Loader2, Sparkles, Download, Save, Star, Trash2, ArrowLeft } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 import type { EnvironmentType, OccasionType, WardrobeItem, StyledOutfit } from '@/types'
 
 export default function AIStylingPage() {
@@ -207,6 +208,26 @@ export default function AIStylingPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Back to Dashboard Button */}
+        <header className="bg-white shadow-sm mb-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Link href="/dashboard">
+                  <Button variant="ghost" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Dashboard
+                  </Button>
+                </Link>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">AI Styling</h1>
+                  <p className="text-sm text-gray-600">Generate personalized outfit suggestions</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-2">
