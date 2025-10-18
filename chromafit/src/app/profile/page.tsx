@@ -156,7 +156,10 @@ export default function ProfilePage() {
         .upsert({
           user_id: user.id,
           display_name: fullName,
-          avatar_photo_url: photoUrl
+          avatar_photo_url: photoUrl,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
         })
 
       if (updateError) {
