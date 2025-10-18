@@ -6,11 +6,12 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { ArrowLeft, Plus, Loader2, Trash2, Edit2, Upload } from 'lucide-react'
+import { ArrowLeft, Plus, Loader2, Trash2, Edit2, Upload, Shirt } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import type { WardrobeItem } from '@/types'
 import { AddGarmentDialog } from '@/components/AddGarmentDialog'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function WardrobePage() {
   const [user, setUser] = useState<any>(null)
@@ -105,28 +106,34 @@ export default function WardrobePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-6">
               <Link href="/dashboard">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                  <ArrowLeft className="h-5 w-5 mr-2" />
                   Back to Dashboard
                 </Button>
               </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">My Wardrobe</h1>
-                <p className="text-sm text-gray-600">Manage your clothing collection</p>
+              <div className="border-l h-8"></div>
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-100 p-2 rounded-lg">
+                  <Shirt className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">My Wardrobe</h1>
+                  <p className="text-gray-600 mt-1">Manage your clothing collection</p>
+                </div>
               </div>
             </div>
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={() => setIsDialogOpen(true)} size="lg" className="bg-black hover:bg-gray-800">
+              <Plus className="h-5 w-5 mr-2" />
               Add Garment
             </Button>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -137,86 +144,126 @@ export default function WardrobePage() {
         )}
 
         {/* Category Filter */}
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-8 flex flex-wrap gap-3">
           {categories.map(category => (
-            <Button
+            <motion.div
               key={category.value}
-              variant={selectedCategory === category.value ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedCategory(category.value)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              {category.label}
-            </Button>
+              <Button
+                variant={selectedCategory === category.value ? 'default' : 'outline'}
+                size="lg"
+                onClick={() => setSelectedCategory(category.value)}
+                className={`rounded-full transition-all ${
+                  selectedCategory === category.value 
+                    ? 'bg-purple-600 hover:bg-purple-700' 
+                    : 'hover:bg-purple-50 hover:border-purple-300'
+                }`}
+              >
+                {category.label}
+              </Button>
+            </motion.div>
           ))}
         </div>
 
         {/* Wardrobe Grid */}
         {filteredItems.length === 0 ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <Upload className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {selectedCategory === 'all' ? 'No items in wardrobe' : `No ${selectedCategory} items`}
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Start building your digital wardrobe by adding your first garment
-              </p>
-              <Button onClick={() => setIsDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Garment
-              </Button>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="text-center py-12">
+              <CardContent>
+                <Upload className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {selectedCategory === 'all' ? 'No items in wardrobe' : `No ${selectedCategory} items`}
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Start building your digital wardrobe by adding your first garment
+                </p>
+                <Button onClick={() => setIsDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Your First Garment
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredItems.map(item => (
-              <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="relative aspect-square bg-gray-100">
-                  <Image
-                    src={item.ai_generated_url || item.original_photo_url}
-                    alt={item.name}
-                    fill
-                    className="object-cover"
-                  />
-                  {item.ai_generated_url && (
-                    <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                      AI Enhanced
+          <AnimatePresence mode="wait">
+            <motion.div 
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+              key={selectedCategory}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {filteredItems.map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  whileHover={{ y: -8 }}
+                  layout
+                >
+                  <Card className="overflow-hidden hover:shadow-2xl transition-all border-2 hover:border-purple-200">
+                    <div className="relative aspect-square bg-gray-100">
+                      <Image
+                        src={item.ai_generated_url || item.original_photo_url}
+                        alt={item.name}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      {item.ai_generated_url && (
+                        <motion.div 
+                          className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded"
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.2 }}
+                        >
+                          AI Enhanced
+                        </motion.div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">{item.name}</CardTitle>
-                  <CardDescription className="capitalize">{item.category}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm text-gray-600">
-                    {item.brand && <p><span className="font-medium">Brand:</span> {item.brand}</p>}
-                    {item.size && <p><span className="font-medium">Size:</span> {item.size}</p>}
-                    {item.color && <p><span className="font-medium">Color:</span> {item.color}</p>}
-                  </div>
-                  <div className="flex space-x-2 mt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => {/* TODO: Edit functionality */}}
-                    >
-                      <Edit2 className="h-3 w-3 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => handleDeleteItem(item.id)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">{item.name}</CardTitle>
+                      <CardDescription className="capitalize">{item.category}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        {item.brand && <p><span className="font-medium">Brand:</span> {item.brand}</p>}
+                        {item.size && <p><span className="font-medium">Size:</span> {item.size}</p>}
+                        {item.color && <p><span className="font-medium">Color:</span> {item.color}</p>}
+                      </div>
+                      <div className="flex space-x-2 mt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {/* TODO: Edit functionality */}}
+                        >
+                          <Edit2 className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => handleDeleteItem(item.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </motion.div>
+          </AnimatePresence>
         )}
       </main>
 
