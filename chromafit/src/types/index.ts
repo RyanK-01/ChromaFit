@@ -67,14 +67,14 @@ export interface UpdateWardrobeItem {
 }
 
 // AI Styling Types
-export type EnvironmentType = 
+export type PredefinedEnvironmentType = 
   | 'office'
   | 'school'
   | 'gym'
   | 'casual'
   | 'formal'
 
-export type OccasionType = 
+export type PredefinedOccasionType = 
   | 'party'
   | 'date'
   | 'wedding'
@@ -82,6 +82,9 @@ export type OccasionType =
   | 'meeting'
   | 'workout'
   | 'everyday'
+
+export type EnvironmentType = PredefinedEnvironmentType | string
+export type OccasionType = PredefinedOccasionType | string
 
 export interface StyledOutfit {
   id: string
@@ -108,9 +111,12 @@ export interface CreateStyledOutfit {
   notes?: string
 }
 
+export type GenderType = 'masculine' | 'feminine' | 'unisex'
+
 export interface StyleRequest {
   environmentType?: EnvironmentType
   occasionType?: OccasionType
   selectedItems?: string[]
   customPrompt?: string
+  gender?: GenderType
 }

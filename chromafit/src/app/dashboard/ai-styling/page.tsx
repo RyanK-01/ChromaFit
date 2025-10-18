@@ -9,11 +9,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Sparkles, Download, Save, Star, Trash2, ArrowLeft } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import type { EnvironmentType, OccasionType, WardrobeItem, StyledOutfit } from '@/types'
+import type { EnvironmentType, OccasionType, WardrobeItem, StyledOutfit, GenderType } from '@/types'
 
 export default function AIStylingPage() {
   const [environmentType, setEnvironmentType] = useState<EnvironmentType | ''>('')
   const [occasionType, setOccasionType] = useState<OccasionType | ''>('')
+  const [gender, setGender] = useState<GenderType | ''>('')
   const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([])
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [customPrompt, setCustomPrompt] = useState('')
@@ -75,11 +76,6 @@ export default function AIStylingPage() {
   }
 
   const handleGenerate = async () => {
-    if (!environmentType && !occasionType) {
-      setError('Please select either an environment or occasion')
-      return
-    }
-
     if (!hasRealisticPhoto) {
       setError('Please upload a photo in your profile first to generate styled outfits')
       return
@@ -97,6 +93,7 @@ export default function AIStylingPage() {
         },
         body: JSON.stringify({
           environmentType: environmentType || undefined,
+          gender: gender || undefined,
           occasionType: occasionType || undefined,
           selectedItems: selectedItems.length > 0 ? selectedItems : undefined,
           customPrompt: customPrompt || undefined
@@ -272,6 +269,28 @@ export default function AIStylingPage() {
               </CardContent>
             </Card>
 
+            {/* Gender Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Select Style Preference</CardTitle>
+                <CardDescription>Choose your preferred style direction</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-3">
+                  {(['masculine', 'feminine', 'unisex'] as GenderType[]).map((g) => (
+                    <Button
+                      key={g}
+                      variant={gender === g ? 'default' : 'outline'}
+                      onClick={() => setGender(g)}
+                      className="capitalize"
+                    >
+                      {g}
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Occasion Selection */}
             <Card>
               <CardHeader>
@@ -365,7 +384,7 @@ export default function AIStylingPage() {
             {/* Generate Button */}
             <Button
               onClick={handleGenerate}
-              disabled={generating || (!environmentType && !occasionType) || !hasRealisticPhoto}
+              disabled={generating || !hasRealisticPhoto}
               className="w-full h-12 text-lg"
             >
               {generating ? (
