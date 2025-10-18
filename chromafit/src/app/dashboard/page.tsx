@@ -116,8 +116,36 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full" variant="outline">
+              <Button 
+                className="w-full" 
+                variant="outline"
+                onClick={() => router.push('/dashboard/wardrobe')}
+              >
                 View Wardrobe
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* AI Styling Card */}
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="bg-pink-100 p-3 rounded-lg">
+                  <Sparkles className="h-6 w-6 text-pink-600" />
+                </div>
+              </div>
+              <CardTitle className="mt-4">AI Styling</CardTitle>
+              <CardDescription>
+                Generate styled outfit images for any occasion
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                className="w-full" 
+                variant="outline"
+                onClick={() => router.push('/dashboard/ai-styling')}
+              >
+                Try AI Styling
               </Button>
             </CardContent>
           </Card>

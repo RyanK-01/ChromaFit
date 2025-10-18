@@ -65,3 +65,52 @@ export interface UpdateWardrobeItem {
   notes?: string
   ai_generated_url?: string
 }
+
+// AI Styling Types
+export type EnvironmentType = 
+  | 'office'
+  | 'school'
+  | 'gym'
+  | 'casual'
+  | 'formal'
+
+export type OccasionType = 
+  | 'party'
+  | 'date'
+  | 'wedding'
+  | 'interview'
+  | 'meeting'
+  | 'workout'
+  | 'everyday'
+
+export interface StyledOutfit {
+  id: string
+  user_id: string
+  name: string
+  environment_type?: EnvironmentType | null
+  occasion_type?: OccasionType | null
+  styled_image_url: string
+  wardrobe_items?: string[] | null
+  prompt_used?: string | null
+  rating?: number | null
+  notes?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateStyledOutfit {
+  name: string
+  environment_type?: EnvironmentType
+  occasion_type?: OccasionType
+  styled_image_url: string
+  wardrobe_items?: string[]
+  prompt_used?: string
+  notes?: string
+}
+
+export interface StyleRequest {
+  environmentType?: EnvironmentType
+  occasionType?: OccasionType
+  selectedItems?: string[]
+  customPrompt?: string
+}

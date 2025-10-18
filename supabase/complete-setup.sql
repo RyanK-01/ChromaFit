@@ -253,7 +253,63 @@ CREATE INDEX IF NOT EXISTS wardrobe_category_idx ON public.wardrobe(category);
 CREATE INDEX IF NOT EXISTS wardrobe_created_at_idx ON public.wardrobe(created_at DESC);
 
 -- ============================================
--- PART 4: VERIFICATION
+-- PART 4: STYLED OUTFITS TABLE SETUP
+-- ============================================
+
+-- Step 1: Create styled_outfits table
+CREATE TABLE IF NOT EXISTS public.styled_outfits (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  name text not null,
+  environment_type text check (environment_type in ('office', 'school', 'gym', 'casual', 'formal')),
+  occasion_type text check (occasion_type in ('party', 'date', 'wedding', 'interview', 'meeting', 'workout', 'everyday')),
+  styled_image_url text not null,
+  wardrobe_items uuid[] default '{}',
+  prompt_used text,
+  rating integer check (rating >= 1 and rating <= 5),
+  notes text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Step 2: Enable RLS on styled_outfits
+ALTER TABLE public.styled_outfits ENABLE ROW LEVEL SECURITY;
+
+-- Step 3: Create styled_outfits RLS policies
+DROP POLICY IF EXISTS "Users can view their own styled outfits" ON public.styled_outfits;
+DROP POLICY IF EXISTS "Users can insert their own styled outfits" ON public.styled_outfits;
+DROP POLICY IF EXISTS "Users can update their own styled outfits" ON public.styled_outfits;
+DROP POLICY IF EXISTS "Users can delete their own styled outfits" ON public.styled_outfits;
+
+CREATE POLICY "Users can view their own styled outfits"
+ON public.styled_outfits
+FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own styled outfits"
+ON public.styled_outfits
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own styled outfits"
+ON public.styled_outfits
+FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own styled outfits"
+ON public.styled_outfits
+FOR DELETE
+USING (auth.uid() = user_id);
+
+-- Step 4: Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS styled_outfits_user_id_idx ON public.styled_outfits(user_id);
+CREATE INDEX IF NOT EXISTS styled_outfits_environment_idx ON public.styled_outfits(environment_type);
+CREATE INDEX IF NOT EXISTS styled_outfits_occasion_idx ON public.styled_outfits(occasion_type);
+CREATE INDEX IF NOT EXISTS styled_outfits_created_at_idx ON public.styled_outfits(created_at DESC);
+
+-- ============================================
+-- PART 5: VERIFICATION
 -- ============================================
 
 -- Show results
@@ -261,6 +317,7 @@ SELECT '✅ Storage buckets created' as status;
 SELECT '✅ Storage policies created' as status;
 SELECT '✅ Profiles table created' as status;
 SELECT '✅ Wardrobe table created' as status;
+SELECT '✅ Styled outfits table created' as status;
 SELECT '✅ RLS policies created' as status;
 SELECT '✅ Trigger created for new users' as status;
 
@@ -269,6 +326,8 @@ SELECT
   'Summary' as info,
   (SELECT COUNT(*) FROM storage.buckets WHERE id IN ('avatars', 'garments', 'tryons')) as buckets,
   (SELECT COUNT(*) FROM public.profiles) as profiles,
+  (SELECT COUNT(*) FROM public.wardrobe) as wardrobe_items,
+  (SELECT COUNT(*) FROM public.styled_outfits) as styled_outfits,
   (SELECT COUNT(*) FROM pg_policies WHERE tablename = 'profiles') as profile_policies;
 
 -- Show your profile
@@ -279,8 +338,12 @@ SELECT
   CASE 
     WHEN avatar_photo_url IS NOT NULL THEN '✅ Has photo'
     ELSE '⚠️ No photo yet'
-  END as photo_status
+  END as photo_status,
+  CASE 
+    WHEN realistic_photo_url IS NOT NULL THEN '✅ Has realistic avatar'
+    ELSE '⚠️ No realistic avatar yet'
+  END as realistic_status
 FROM public.profiles
 WHERE user_id = auth.uid();
 
-SELECT '🎉 Setup complete! You can now upload photos in the profile page.' as final_message;
+SELECT '🎉 Setup complete! You can now use all ChromaFit features.' as final_message;
