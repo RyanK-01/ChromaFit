@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,15 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Upload, X, Camera } from 'lucide-react'
 import Image from 'next/image'
-import type { WardrobeCategory } from '@/types'
+import type { WardrobeCategory, WardrobeItem } from '@/types'
 
 interface AddGarmentDialogProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  editingItem?: WardrobeItem | null
 }
 
-export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogProps) {
+export function AddGarmentDialog({ open, onClose, onSuccess, editingItem }: AddGarmentDialogProps) {
   const [name, setName] = useState('')
   const [category, setCategory] = useState<WardrobeCategory>('top')
   const [brand, setBrand] = useState('')
@@ -32,6 +33,33 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
   const [success, setSuccess] = useState('')
 
   const supabase = createClient()
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingItem) {
+      setName(editingItem.name || '')
+      setCategory(editingItem.category)
+      setBrand(editingItem.brand || '')
+      setSize(editingItem.size || '')
+      setColor(editingItem.color || '')
+      setMaterial(editingItem.material || '')
+      setNotes(editingItem.notes || '')
+      setPhotoPreview(editingItem.ai_generated_url || editingItem.original_photo_url || null)
+    } else {
+      // Reset form when adding new item
+      setName('')
+      setCategory('top')
+      setBrand('')
+      setSize('')
+      setColor('')
+      setMaterial('')
+      setNotes('')
+      setPhotoFile(null)
+      setPhotoPreview(null)
+    }
+    setError('')
+    setSuccess('')
+  }, [editingItem, open])
 
   if (!open) return null
 
@@ -184,12 +212,6 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
     setUploading(true)
 
     try {
-      if (!photoFile) {
-        setError('Please select a photo')
-        setUploading(false)
-        return
-      }
-
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         setError('You must be logged in')
@@ -197,61 +219,97 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
         return
       }
 
-      // Upload original photo
-      setSuccess('Uploading photo...')
-      const originalPhotoUrl = await uploadGarmentPhoto(photoFile)
-      
-      if (!originalPhotoUrl) {
-        throw new Error('Failed to upload photo')
+      let originalPhotoUrl = editingItem?.original_photo_url || ''
+      let aiGeneratedUrl = editingItem?.ai_generated_url || null
+
+      // If editing mode and there's a new photo, upload it
+      if (editingItem && photoFile) {
+        setSuccess('Uploading new photo...')
+        const uploadedUrl = await uploadGarmentPhoto(photoFile)
+        
+        if (!uploadedUrl) {
+          throw new Error('Failed to upload photo')
+        }
+        originalPhotoUrl = uploadedUrl
+
+        // Generate AI-enhanced version for new photo
+        setSuccess('Generating AI-enhanced version...')
+        aiGeneratedUrl = await generateAIGarment(originalPhotoUrl)
+      }
+      // If adding new item, photo is required
+      else if (!editingItem) {
+        if (!photoFile) {
+          setError('Please select a photo')
+          setUploading(false)
+          return
+        }
+
+        // Upload original photo
+        setSuccess('Uploading photo...')
+        const uploadedUrl = await uploadGarmentPhoto(photoFile)
+        
+        if (!uploadedUrl) {
+          throw new Error('Failed to upload photo')
+        }
+        originalPhotoUrl = uploadedUrl
+
+        // Generate AI-enhanced version
+        setSuccess('Generating AI-enhanced version...')
+        aiGeneratedUrl = await generateAIGarment(originalPhotoUrl)
       }
 
-      // Generate AI-enhanced version
-      setSuccess('Generating AI-enhanced version...')
-      const aiGeneratedUrl = await generateAIGarment(originalPhotoUrl)
-
-      // Save to database
-      console.log('💾 Attempting to save to wardrobe:', {
+      // Prepare data
+      const garmentData = {
         user_id: user.id,
         name: name,
-        category: category
-      })
-      
-      const { data: insertData, error: insertError } = await supabase
-        .from('wardrobe')
-        .insert({
-          user_id: user.id,
-          name: name,
-          category: category,
-          original_photo_url: originalPhotoUrl,
-          ai_generated_url: aiGeneratedUrl,
-          brand: brand || null,
-          size: size || null,
-          color: color || null,
-          material: material || null,
-          notes: notes || null
-        })
-
-      if (insertError) {
-        console.error('❌ Database insert error:', insertError)
-        console.error('❌ Error details:', {
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          code: insertError.code
-        })
-        throw insertError
+        category: category,
+        original_photo_url: originalPhotoUrl,
+        ai_generated_url: aiGeneratedUrl,
+        brand: brand || null,
+        size: size || null,
+        color: color || null,
+        material: material || null,
+        notes: notes || null
       }
 
-      console.log('✅ Successfully saved to wardrobe:', insertData)
+      if (editingItem) {
+        // Update existing item
+        console.log('✏️ Updating garment:', editingItem.id)
+        const { error: updateError } = await supabase
+          .from('wardrobe')
+          .update(garmentData)
+          .eq('id', editingItem.id)
 
-      setSuccess('Garment added successfully!')
+        if (updateError) {
+          console.error('❌ Database update error:', updateError)
+          throw updateError
+        }
+
+        console.log('✅ Successfully updated garment')
+        setSuccess('Garment updated successfully!')
+      } else {
+        // Insert new item
+        console.log('💾 Adding new garment to wardrobe')
+        const { error: insertError } = await supabase
+          .from('wardrobe')
+          .insert(garmentData)
+
+        if (insertError) {
+          console.error('❌ Database insert error:', insertError)
+          throw insertError
+        }
+
+        console.log('✅ Successfully added garment')
+        setSuccess('Garment added successfully!')
+      }
+
       setTimeout(() => {
         onSuccess()
         handleClose()
       }, 1000)
     } catch (err: any) {
-      console.error('Error adding garment:', err)
-      setError(err.message || 'Failed to add garment')
+      console.error('Error saving garment:', err)
+      setError(err.message || 'Failed to save garment')
     } finally {
       setUploading(false)
     }
@@ -273,13 +331,17 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Add Garment to Wardrobe</CardTitle>
-              <CardDescription>Upload a photo and add details about your clothing item</CardDescription>
+              <CardTitle>{editingItem ? 'Edit Garment' : 'Add Garment to Wardrobe'}</CardTitle>
+              <CardDescription>
+                {editingItem 
+                  ? 'Update the details of your clothing item' 
+                  : 'Upload a photo and add details about your clothing item'}
+              </CardDescription>
             </div>
             <Button variant="ghost" size="sm" onClick={handleClose}>
               <X className="h-4 w-4" />
@@ -291,7 +353,7 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
             {/* Photo Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Garment Photo *
+                Garment Photo {editingItem ? '(optional - leave to keep current)' : '*'}
               </label>
               <div className="flex flex-col items-center gap-4">
                 <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
@@ -474,10 +536,10 @@ export function AddGarmentDialog({ open, onClose, onSuccess }: AddGarmentDialogP
                 {uploading || generating ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {generating ? 'Generating...' : 'Adding...'}
+                    {generating ? 'Generating...' : editingItem ? 'Updating...' : 'Adding...'}
                   </>
                 ) : (
-                  'Add to Wardrobe'
+                  editingItem ? 'Update Garment' : 'Add to Wardrobe'
                 )}
               </Button>
             </div>

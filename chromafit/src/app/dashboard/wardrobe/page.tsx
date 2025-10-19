@@ -20,6 +20,7 @@ export default function WardrobePage() {
   const [error, setError] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<WardrobeItem | null>(null)
   
   const router = useRouter()
   const supabase = createClient()
@@ -86,6 +87,16 @@ export default function WardrobePage() {
       console.error('Error deleting item:', err)
       setError(err.message || 'Failed to delete item')
     }
+  }
+
+  const handleEditItem = (item: WardrobeItem) => {
+    setEditingItem(item)
+    setIsDialogOpen(true)
+  }
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false)
+    setEditingItem(null)
   }
 
   const filteredItems = selectedCategory === 'all'
@@ -244,7 +255,7 @@ export default function WardrobePage() {
                           variant="outline"
                           size="sm"
                           className="flex-1"
-                          onClick={() => {/* TODO: Edit functionality */}}
+                          onClick={() => handleEditItem(item)}
                         >
                           <Edit2 className="h-3 w-3 mr-1" />
                           Edit
@@ -267,11 +278,12 @@ export default function WardrobePage() {
         )}
       </main>
 
-      {/* Add Garment Dialog */}
+      {/* Add/Edit Garment Dialog */}
       <AddGarmentDialog
         open={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
+        onClose={handleCloseDialog}
         onSuccess={loadUserAndWardrobe}
+        editingItem={editingItem}
       />
     </div>
   )
