@@ -13,8 +13,25 @@ export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [aiRecommendation, setAiRecommendation] = useState<string>('')
+  const [selectedMood, setSelectedMood] = useState<string>('')
+
+  const getMoodRecommendation = (mood: string) => {
+    switch (mood) {
+      case '😎':
+        return 'dress stylish'
+      case '🥰':
+        return 'dress confident'
+      case '😴':
+        return 'dress comfortably'
+      default:
+        return ''
+    }
+  }
   const router = useRouter()
   const supabase = createClient()
+
+
 
   useEffect(() => {
     const getUser = async () => {
@@ -34,6 +51,16 @@ export default function DashboardPage() {
         if (profileData) {
           setProfile(profileData)
         }
+
+        // Set AI recommendation based on weather (simulated for now)
+        const recommendations = [
+          'pastel tones for this week\'s weather',
+          'layered outfits for the changing temperatures',
+          'earth tones to match the season',
+          'bright colors to lift your mood'
+        ]
+        const randomRec = recommendations[Math.floor(Math.random() * recommendations.length)]
+        setAiRecommendation(randomRec)
       }
       setLoading(false)
     }
@@ -58,26 +85,59 @@ export default function DashboardPage() {
     return 'U'
   }
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    let timeGreeting = '👋'
+    if (hour >= 5 && hour < 12) {
+      timeGreeting = '🌞'
+    } else if (hour >= 12 && hour < 17) {
+      timeGreeting = '☀️'
+    } else if (hour >= 17 && hour < 21) {
+      timeGreeting = '🌅'
+    } else {
+      timeGreeting = '🌙'
+    }
+
+    const name = profile?.display_name || user?.user_metadata?.full_name || 'there'
+    const firstName = name.split(' ')[0]
+
+    let greeting = 'Welcome'
+    if (hour >= 5 && hour < 12) {
+      greeting = 'Good morning'
+    } else if (hour >= 12 && hour < 17) {
+      greeting = 'Good afternoon'
+    } else if (hour >= 17 && hour < 21) {
+      greeting = 'Good evening'
+    } else {
+      greeting = 'Good evening'
+    }
+
+    return `${greeting}, ${firstName} ${timeGreeting}`
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#E6DCD3]">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-neutral-300 border-t-neutral-800"></div>
+          <p className="mt-4 text-neutral-600 font-light">Loading...</p>
+        </motion.div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen animated-fabric-bg overflow-hidden">
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-md shadow-sm">
+      <header className="bg-white/70 backdrop-blur-md border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <div className="text-2xl">👕</div>
-              <h1 className="text-2xl font-bold text-gray-900">ChromaFit</h1>
+              <h1 className="text-2xl font-normal tracking-tight text-neutral-800 font-display">ChromaFit</h1>
             </div>
             <div className="flex items-center space-x-4">
               {/* Profile Picture or Initial - Clickable */}
@@ -87,7 +147,7 @@ export default function DashboardPage() {
                 title="View Profile"
               >
                 {profile?.avatar_photo_url ? (
-                  <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 group-hover:border-blue-500 transition-colors cursor-pointer">
+                  <div className="relative w-10 h-10 rounded-full overflow-hidden border border-neutral-200 group-hover:border-neutral-400 transition-colors cursor-pointer">
                     <Image
                       src={profile.avatar_photo_url}
                       alt="Profile"
@@ -96,18 +156,23 @@ export default function DashboardPage() {
                     />
                   </div>
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-blue-600 group-hover:bg-blue-700 text-white flex items-center justify-center font-semibold text-lg transition-colors cursor-pointer">
+                  <div className="w-10 h-10 rounded-full bg-neutral-800 group-hover:bg-neutral-700 text-white flex items-center justify-center font-light text-lg transition-colors cursor-pointer">
                     {getInitial()}
                   </div>
                 )}
                 {/* Hover tooltip */}
-                <div className="absolute -bottom-8 right-0 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                <div className="absolute -bottom-8 right-0 bg-neutral-800 text-white text-xs px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                   View Profile
                 </div>
               </button>
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleSignOut}
+                className="rounded-full border-neutral-300 hover:bg-neutral-100 text-neutral-600 transition-colors"
+              >
                 <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+                Sign out
               </Button>
             </div>
           </div>
@@ -115,53 +180,108 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <motion.div 
-          className="mb-8 text-center"
+          className="mb-12 text-center"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back! 👋
+          <h2 className="text-4xl font-display text-neutral-800 mb-3 tracking-tight">
+            {getGreeting()}
           </h2>
-          <p className="text-gray-600">
-            Your virtual wardrobe and try-on dashboard
+          <p className="text-lg text-neutral-600 font-light mb-8">
+            Ready to style something new?
           </p>
+          <motion.div
+            className="w-full max-w-lg mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <Card className="h-full hover:shadow-xl transition-all duration-300 bg-white/90 backdrop-blur-sm border-neutral-200">
+              <CardHeader>
+                <div className="text-center">
+                  <CardTitle className="text-xl font-display text-neutral-800 mb-2">How do you feel today?</CardTitle>
+                  <CardDescription className="text-neutral-600">Select your mood for personalized style recommendations</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex justify-center gap-8">
+                  {['😎', '🥰', '😴'].map((mood) => (
+                    <motion.button
+                      key={mood}
+                      onClick={() => {
+                        setSelectedMood(mood)
+                        setAiRecommendation(getMoodRecommendation(mood))
+                      }}
+                      className={`p-4 text-4xl rounded-2xl transition-all duration-200 ${
+                        selectedMood === mood 
+                          ? 'bg-white shadow-lg scale-110 hover:bg-neutral-50' 
+                          : 'hover:bg-white/80 hover:scale-105'
+                      }`}
+                      whileHover={{ 
+                        scale: selectedMood === mood ? 1.1 : 1.05,
+                        y: -2,
+                      }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {mood}
+                    </motion.button>
+                  ))}
+                </div>
+                {aiRecommendation && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center p-4 bg-neutral-800 text-white rounded-2xl shadow-sm"
+                  >
+                    <p className="text-lg font-light">
+                      Let's <span className="font-medium">{aiRecommendation}</span> today!
+                    </p>
+                  </motion.div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         </motion.div>
 
         {/* Dashboard Grid - 2x2 layout for 4 cards */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
           {/* Wardrobe Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            whileHover={{ scale: 1.03, y: -5 }}
+            whileHover={{ 
+              scale: 1.05,
+              y: -5,
+              transition: { type: "spring", stiffness: 400 }
+            }}
             whileTap={{ scale: 0.98 }}
           >
-            <Card className="h-full hover:shadow-xl transition-all cursor-pointer border-2 hover:border-purple-200">
+            <Card className="h-full hover:shadow-xl transition-all duration-300 cursor-pointer bg-white/90 backdrop-blur-sm border-neutral-200">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <motion.div 
-                    className="bg-purple-100 p-3 rounded-lg"
-                    whileHover={{ rotate: 5, scale: 1.1 }}
+                    className="bg-neutral-100 p-3 rounded-xl"
+                    whileHover={{ rotate: 5 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >
-                    <Shirt className="h-6 w-6 text-purple-600" />
+                    <Shirt className="h-6 w-6 text-neutral-800" />
                   </motion.div>
                 </div>
-                <CardTitle className="mt-4">My Wardrobe</CardTitle>
-                <CardDescription>
+                <CardTitle className="mt-4 text-xl font-display text-neutral-800">My Wardrobe</CardTitle>
+                <CardDescription className="text-neutral-600">
                   Manage your virtual wardrobe and add new garments
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button 
-                  className="w-full bg-purple-600 hover:bg-purple-700" 
+                  className="w-full h-12 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors text-white font-light" 
                   onClick={() => router.push('/dashboard/wardrobe')}
                 >
-                  View Wardrobe
+                  Open wardrobe
                 </Button>
               </CardContent>
             </Card>
@@ -172,31 +292,35 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            whileHover={{ scale: 1.03, y: -5 }}
+            whileHover={{ 
+              scale: 1.05,
+              y: -5,
+              transition: { type: "spring", stiffness: 400 }
+            }}
             whileTap={{ scale: 0.98 }}
           >
-            <Card className="h-full hover:shadow-xl transition-all cursor-pointer border-2 hover:border-green-200">
+            <Card className="h-full hover:shadow-xl transition-all duration-300 cursor-pointer bg-white/90 backdrop-blur-sm border-neutral-200">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <motion.div 
-                    className="bg-green-100 p-3 rounded-lg"
-                    whileHover={{ rotate: 5, scale: 1.1 }}
+                    className="bg-neutral-100 p-3 rounded-xl"
+                    whileHover={{ rotate: 5 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >
-                    <Sparkles className="h-6 w-6 text-green-600" />
+                    <Sparkles className="h-6 w-6 text-neutral-800" />
                   </motion.div>
                 </div>
-                <CardTitle className="mt-4">Virtual Try-On</CardTitle>
-                <CardDescription>
+                <CardTitle className="mt-4 text-xl font-display text-neutral-800">Virtual Try-On</CardTitle>
+                <CardDescription className="text-neutral-600">
                   Try on garments with AI-powered fit analysis
                 </CardDescription>
             </CardHeader>
             <CardContent>
               <Button 
-                className="w-full bg-green-600 hover:bg-green-700" 
+                className="w-full h-12 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors text-white font-light" 
                 onClick={() => router.push('/dashboard/tryon')}
               >
-                Start Try-On
+                Start try-on
               </Button>
             </CardContent>
           </Card>
@@ -207,31 +331,35 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            whileHover={{ scale: 1.03, y: -5 }}
+            whileHover={{ 
+              scale: 1.05,
+              y: -5,
+              transition: { type: "spring", stiffness: 400 }
+            }}
             whileTap={{ scale: 0.98 }}
           >
-            <Card className="h-full hover:shadow-xl transition-all cursor-pointer border-2 hover:border-pink-200">
+            <Card className="h-full hover:shadow-xl transition-all duration-300 cursor-pointer bg-white/90 backdrop-blur-sm border-neutral-200">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <motion.div 
-                    className="bg-pink-100 p-3 rounded-lg"
-                    whileHover={{ rotate: 5, scale: 1.1 }}
+                    className="bg-neutral-100 p-3 rounded-xl"
+                    whileHover={{ rotate: 5 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >
-                    <Sparkles className="h-6 w-6 text-pink-600" />
+                    <Sparkles className="h-6 w-6 text-neutral-800" />
                   </motion.div>
                 </div>
-                <CardTitle className="mt-4">AI Styling</CardTitle>
-                <CardDescription>
+                <CardTitle className="mt-4 text-xl font-display text-neutral-800">AI Styling</CardTitle>
+                <CardDescription className="text-neutral-600">
                   Generate styled outfit images for any occasion
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button 
-                  className="w-full bg-pink-600 hover:bg-pink-700" 
+                  className="w-full h-12 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors text-white font-light" 
                   onClick={() => router.push('/dashboard/ai-styling')}
                 >
-                  Try AI Styling
+                  Try AI styling
                 </Button>
               </CardContent>
             </Card>
@@ -242,31 +370,35 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            whileHover={{ scale: 1.03, y: -5 }}
+            whileHover={{ 
+              scale: 1.05,
+              y: -5,
+              transition: { type: "spring", stiffness: 400 }
+            }}
             whileTap={{ scale: 0.98 }}
           >
-            <Card className="h-full hover:shadow-xl transition-all cursor-pointer border-2 hover:border-orange-200">
+            <Card className="h-full hover:shadow-xl transition-all duration-300 cursor-pointer bg-white/90 backdrop-blur-sm border-neutral-200">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <motion.div 
-                    className="bg-orange-100 p-3 rounded-lg"
-                    whileHover={{ rotate: 5, scale: 1.1 }}
+                    className="bg-neutral-100 p-3 rounded-xl"
+                    whileHover={{ rotate: 5 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >
-                    <Flame className="h-6 w-6 text-orange-600" />
+                    <Flame className="h-6 w-6 text-neutral-800" />
                   </motion.div>
                 </div>
-                <CardTitle className="mt-4">Explore Trending Styles</CardTitle>
-                <CardDescription>
+                <CardTitle className="mt-4 text-xl font-display text-neutral-800">Explore Trends</CardTitle>
+                <CardDescription className="text-neutral-600">
                   Discover what's trending in fashion right now
                 </CardDescription>
             </CardHeader>
             <CardContent>
               <Button 
-                className="w-full bg-orange-600 hover:bg-orange-700" 
+                className="w-full h-12 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors text-white font-light" 
                 onClick={() => router.push('/dashboard/explore')}
               >
-                Explore Trends
+                Browse trends
               </Button>
             </CardContent>
           </Card>
