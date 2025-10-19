@@ -1,134 +1,194 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Slider } from '@/components/ui/slider'
-interface UserProfile {
-  height: number
-  weight: number
-}
+import { AvatarUpload } from '@/components/AvatarUpload'
+import { User } from 'lucide-react'
 
 export default function OnboardingPage() {
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [error, setError] = useState('')
+  const [showUpload, setShowUpload] = useState(false)
   const router = useRouter()
   const supabase = createClient()
-  const [profile, setProfile] = useState<UserProfile>({
-    height: 170,
-    weight: 70
-  })
 
-  const handleNext = async () => {
-      // Save profile data
+  useEffect(() => {
+    const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/auth/login')
-        return
+      } else {
+        setUser(user)
       }
+      setLoading(false)
+    }
+    getUser()
+  }, [router, supabase.auth])
 
-      try {
-        // Try to refresh schema cache first
-        await supabase.schema('public')
-        
-        const updatePayload = {
-          height: profile.height,
-          weight: profile.weight,
-          onboarding_completed: true,
-        }
+  const handleUpload = async (file: File): Promise<string> => {
+    if (!user) throw new Error('User not authenticated')
 
-        // Create or update the profile
-        const res = await supabase
-          .from('profiles')
-          .upsert({ 
-            ...updatePayload,
-            user_id: user.id,
-          })
-          .select()
+    setIsUploading(true)
+    setUploadProgress(0)
+    setError('')
 
-        if (res.error) {
-          // Log the error object and the full response so we can see status/details/hint
-          console.error(`Error saving profile: ${JSON.stringify(res.error)}`)
-          console.error(`Full update response: ${JSON.stringify(res)}`)
-          return
-        }
-      } catch (err) {
-        console.error('Unexpected error saving profile:', err)
-        return
-      }
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}/avatar.${fileExt}`
+      
+      setUploadProgress(25)
 
-      router.push('/dashboard')
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        })
+
+      if (uploadError) throw uploadError
+
+      setUploadProgress(50)
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName)
+
+      setUploadProgress(75)
+
+      // Update user profile (skip API call for now)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          avatar_photo_url: urlData.publicUrl
+        })
+        .eq('user_id', user.id)
+
+      if (profileError) throw profileError
+
+      setUploadProgress(100)
+      return urlData.publicUrl
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+      throw err
+    } finally {
+      setIsUploading(false)
+    }
   }
 
-  const formatHeight = (cm: number) => {
-    const meters = cm / 100
-    return meters.toFixed(2)
+  const handleComplete = (imageUrl: string) => {
+    setTimeout(() => {
+      router.push('/dashboard')
+    }, 1000)
+  }
+
+  const handleSkipToDashboard = () => {
+    router.push('/dashboard')
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F5EFE6] to-white flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-display text-center">
-            Your measurements
-          </h1>
-          <p className="text-neutral-600 text-center mt-2">
-            This helps us recommend the perfect fit
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome to ChromaFit!</h1>
+          <p className="text-xl text-gray-600">
+            Let's create your 3D avatar
           </p>
         </div>
 
-        <div className="space-y-8">
-              {/* Height Slider */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium text-neutral-700">Height</label>
-                  <span className="text-lg font-medium text-[#4A3728]">{formatHeight(profile.height)}m</span>
-                </div>
-                <Slider
-                  value={[profile.height]}
-                  onValueChange={(value) => setProfile({ ...profile, height: value[0] })}
-                  min={140}
-                  max={200}
-                  step={1}
-                  className="py-4"
-                />
-              </div>
-
-              {/* Weight Slider */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium text-neutral-700">Weight</label>
-                  <span className="text-lg font-medium text-[#4A3728]">{profile.weight}kg</span>
-                </div>
-                <Slider
-                  value={[profile.weight]}
-                  onValueChange={(value) => setProfile({ ...profile, weight: value[0] })}
-                  min={40}
-                  max={120}
-                  step={1}
-                  className="py-4"
-                />
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <div className="flex justify-center mb-4">
+              <div className="bg-blue-100 p-4 rounded-full">
+                <User className="h-12 w-12 text-blue-600" />
               </div>
             </div>
+            <CardTitle className="text-center text-2xl">Create Your 3D Avatar</CardTitle>
+            <CardDescription className="text-center">
+              Upload a photo to generate your personalized 3D avatar with accurate body measurements
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+              <h3 className="font-semibold text-lg">What you'll need:</h3>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <span className="text-blue-600 mr-2">✓</span>
+                  <span>A full-body photo (front-facing works best)</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-blue-600 mr-2">✓</span>
+                  <span>Good lighting conditions</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-blue-600 mr-2">✓</span>
+                  <span>Wear form-fitting clothes for accurate measurements</span>
+                </li>
+              </ul>
+            </div>
 
-        <div className="mt-8">
-          <Button
-            onClick={handleNext}
-            className="w-full h-12 bg-[#8B7355] hover:bg-[#4A3728] text-white rounded-full"
-          >
-            Complete Profile
-          </Button>
-        </div>
-      </Card>
+            {!showUpload ? (
+              <div className="space-y-3">
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => setShowUpload(true)}
+                >
+                  Upload Photo & Create Avatar
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={handleSkipToDashboard}
+                >
+                  Skip for Now
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <AvatarUpload
+                  onUpload={handleUpload}
+                  onComplete={handleComplete}
+                  isUploading={isUploading}
+                  uploadProgress={uploadProgress}
+                  error={error}
+                />
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => setShowUpload(false)}
+                  disabled={isUploading}
+                >
+                  Back
+                </Button>
+              </div>
+            )}
+
+            <p className="text-xs text-center text-gray-500">
+              Your photo will be processed securely and used only to create your 3D avatar
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
